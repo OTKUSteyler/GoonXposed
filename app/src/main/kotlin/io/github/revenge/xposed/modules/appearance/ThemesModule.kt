@@ -3,10 +3,11 @@ package GoonXposed.xposed.module.appearance
 import GoonXposed.xposed.Module
 import GoonXposed.xposed.Constants
 import GoonXposed.xposed.Utils.Companion.JSON
-import GoonXposed.xposed.MethodHookBuilder
 import android.content.Context
 import android.content.res.Resources
 import androidx.core.graphics.toColorInt
+import de.robv.android.xposed.XC_MethodHook
+import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import java.io.File
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -19,12 +20,12 @@ import kotlinx.serialization.json.put
 
 @Serializable
 data class ThemeData(
-        val name: String,
-        val description: String? = null,
-        val authors: List<Author>? = null,
-        val spec: Int,
-        val semanticColors: Map<String, List<String>>? = null,
-        val rawColors: Map<String, String>? = null
+    val name: String,
+    val description: String? = null,
+    val authors: List<Author>? = null,
+    val spec: Int,
+    val semanticColors: Map<String, List<String>>? = null,
+    val rawColors: Map<String, String>? = null
 )
 
 @Serializable data class Theme(val id: String, val selected: Boolean, val data: ThemeData)
@@ -49,9 +50,9 @@ class ThemesModule : Module() {
     }
 
     private fun String.fromScreamingSnakeToCamelCase() =
-            this.split("_").joinToString("") { it ->
-                it.lowercase().replaceFirstChar { it.uppercase() }
-            }
+        this.split("_").joinToString("") { it ->
+            it.lowercase().replaceFirstChar { it.uppercase() }
+        }
 
     override fun onLoad(packageParam: XC_LoadPackage.LoadPackageParam) {
         param = packageParam
@@ -68,9 +69,9 @@ class ThemesModule : Module() {
 
     private fun getTheme(): Theme? {
         val themeFile =
-                File(param.appInfo.dataDir, "${Constants.FILES_DIR}/${THEME_FILE}").apply {
-                    asFile()
-                }
+            File(param.appInfo.dataDir, "${Constants.FILES_DIR}/${THEME_FILE}").apply {
+                asFile()
+            }
         if (!themeFile.isValidish()) return null
 
         return try {
@@ -106,6 +107,61 @@ class ThemesModule : Module() {
         }
 
         // If there's any rawColors value, hook the color getter
+        if (!theme.data.rawColors.isNullOrEmpty()) {
+            val getColorCompat =
+                themeManager.getDeclaredMethod(
+                    "getColorCompat",
+                    Resources::class.java,
+                    Int::class.javaPrimitiveType,
+                    Resources.Theme::class.java,
+                )
+
+            val getColorCompatLegacy =
+                themeManager.getDeclaredMethod(
+                    "getColorCompat",
+                    Context::class.java,
+                    Int::class.javaPrimitiveType
+                )
+
+            val hook = object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    val arg1 = param.args[0]
+                    val resources = if (arg1 is Context) arg1.resources else (arg1 as Resources)
+                    val name = resources.getResourceEntryName(param.args[1] as Int)
+
+                    if (rawColorMap[name] != null) {
+                        param.result = rawColorMap[name]
+                    }
+                }
+            }
+
+            XposedHelpers.hookMethod(getColorCompat, hook)
+            XposedHelpers.hookMethod(getColorCompatLegacy, hook)
+        }
+    }
+
+    // Parse HEX colour string to INT. Takes "#RRGGBBAA" or "#RRGGBB"
+    private fun hexStringToColorInt(hexString: String): Int {
+        return if (hexString.length == 9) {
+            // Rearrange RRGGBBAA -> AARRGGBB so parseColor() is happy
+            val alpha = hexString.substring(7, 9)
+            val rrggbb = hexString.substring(1, 7)
+            "#$alpha$rrggbb".toColorInt()
+        } else hexString.toColorInt()
+    }
+
+    private fun hookThemeMethod(themeClass: Class<*>, methodName: String, themeValue: Int) {
+        try {
+            val method = themeClass.getDeclaredMethod(methodName)
+            val hook = object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    param.result = themeValue
+                }
+            }
+            XposedHelpers.hookMethod(method, hook)
+        } catch (_: NoSuchMethodException) {}
+    }
+}        // If there's any rawColors value, hook the color getter
         if (!theme.data.rawColors.isNullOrEmpty()) {
             val getColorCompat =
                     themeManager.getDeclaredMethod(
