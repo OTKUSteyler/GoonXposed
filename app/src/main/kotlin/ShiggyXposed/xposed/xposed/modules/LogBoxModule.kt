@@ -616,7 +616,7 @@ object LogBoxModule : Module() {
                     val config = JSONObject(configFile.readText())
                     val customLoadUrl = config.optJSONObject("customLoadUrl") ?: JSONObject()
                     customLoadUrl.put("enabled", false)
-                    customLoadUrl.put("url", "http://localhost:4040/shiggycord.js")
+                    customLoadUrl.put("url", "http://localhost:4040/gooncord.js")
                     config.put("customLoadUrl", customLoadUrl)
                     configFile.writeText(config.toString())
                 }
@@ -706,7 +706,7 @@ object LogBoxModule : Module() {
         container.addView(toggleContainer)
 
         val urlInput = EditText(context).apply {
-            hint = "http://localhost:4040/shiggycord.js"
+            hint = "http://localhost:4040/gooncord.js"
             setTextColor(colors.onSurface)
             setHintTextColor(colors.onSurfaceVariant)
             background = createM3Background(context, colors.surfaceVariant, 12f)
@@ -950,7 +950,7 @@ object LogBoxModule : Module() {
 
             val customLoadUrl = config.optJSONObject("customLoadUrl") ?: JSONObject()
             customLoadUrl.put("enabled", false)
-            customLoadUrl.put("url", "http://localhost:4040/shiggycord.js")
+            customLoadUrl.put("url", "http://localhost:4040/gooncord.js")
             config.put("customLoadUrl", customLoadUrl)
 
             configFile.writeText(config.toString())
