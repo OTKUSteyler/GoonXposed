@@ -1,9 +1,9 @@
-# ShiggyXposed
+# GoonXposed
 
-ShiggyXposed is a root Xposed module that injects the ShiggyCord Discord mobile client modifications into the official Discord application.
+GoonXposed is a root Xposed module that injects the ShiggyCord Discord mobile client modifications into the official Discord application.
 
 ## Info
-*   Injects ShiggyCord client into the Discord mobile app.
+*   Injects GoonCord client into the Discord mobile app.
 *   Built in Kotlin.
 *   Material 3 like Shake menu with some discord popup accents 
 
@@ -17,7 +17,7 @@ To use this module, your device must meet the following requirements:
 1.  Download the latest version of the module from the [Releases](https://github.com/kmmiio99o/ShiggyXposed/releases) page.
 2.  Install the downloaded APK file on your device.
 3.  Open the LSPosed manager application.
-4.  Go to the **Modules** section and enable **ShiggyXposed**.
+4.  Go to the **Modules** section and enable **GoonXposed**.
 5.  In the module's settings, set the scope to include the **Discord** application.
 6.  Reboot your device for the changes to take effect.
 
