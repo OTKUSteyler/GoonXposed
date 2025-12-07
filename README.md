@@ -14,7 +14,7 @@ To use this module, your device must meet the following requirements:
 *   **Target Application**: An official Discord application (stable, beta, or alpha version).
 
 ## Installation
-1.  Download the latest version of the module from the [Releases](https://github.com/kmmiio99o/ShiggyXposed/releases) page.
+1.  Download the latest version of the module from the [Releases](https://github.com/OTKUSteyler/GoonXposed/releases) page.
 2.  Install the downloaded APK file on your device.
 3.  Open the LSPosed manager application.
 4.  Go to the **Modules** section and enable **GoonXposed**.
