@@ -5,15 +5,15 @@ plugins {
 }
 
 android {
-    namespace = "GoonXposed.xposed"
+    namespace = "ShiggyXposed.xposed"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "GoonXposed.xposed"
+        applicationId = "ShiggyXposed.xposed"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1330
-        versionName = "1.3.3"
+        versionCode = 1230
+        versionName = "1.2.3"
     }
 
     buildTypes {
