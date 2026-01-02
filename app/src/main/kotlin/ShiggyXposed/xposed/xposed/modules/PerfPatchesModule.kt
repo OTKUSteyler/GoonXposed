@@ -1,0 +1,317 @@
+package ShiggyXposed.xposed.modules
+
+import de.robv.android.xposed.callbacks.XC_LoadPackage
+import kotlinx.serialization.json.JsonObjectBuilder
+import kotlinx.serialization.json.put
+import ShiggyXposed.xposed.Constants
+import ShiggyXposed.xposed.Module
+import ShiggyXposed.xposed.Utils.Log
+import java.io.File
+
+/**
+ * PerfPatchesModule
+ *
+ * Writes a small JavaScript preload into the module's `preloads` directory.
+ * The preload performs guarded, best-effort runtime monkeypatches to:
+ *  - add memoization to expensive pure functions (if present)
+ *  - cache RowGenerator.generate outputs on instances when inputs look stable
+ *  - batch analytics/log events to avoid high-frequency synchronous work
+ *
+ * The implementation is intentionally defensive: it never throws and only applies
+ * patches if the targeted symbols exist.
+ */
+object PerfPatchesModule : Module() {
+    private const val FILE_NAME = "perf_patches.js"
+
+    override fun onLoad(packageParam: XC_LoadPackage.LoadPackageParam) {
+        try {
+            // Build preloads path inside the app data files directory
+            val filesDir = File(packageParam.appInfo.dataDir, Constants.FILES_DIR).apply { mkdirs() }
+            val preloadsDir = File(filesDir, HookScriptLoaderModule.PRELOADS_DIR).apply { mkdirs() }
+            val out = File(preloadsDir, FILE_NAME)
+
+            // Defensive JS runtime patch. Avoid template literals with ${} to prevent Kotlin interpolation.
+            val js = """
+                (function(){
+                  try {
+                    if (!globalThis.__SHIGGY_PERF_PATCHES__) {
+                      globalThis.__SHIGGY_PERF_PATCHES__ = { installedAt: Date.now(), enabled: true };
+                    }
+
+                    function safe(fn) {
+                      return function() {
+                        try { return fn.apply(this, arguments); }
+                        catch (e) { try { console && console.warn && console.warn('shiggy patch error', e); } catch(_){} }
+                      };
+                    }
+
+                    function memoize(fn, maxEntries) {
+                      if (typeof fn !== 'function') return fn;
+                      var cache = new Map();
+                      maxEntries = Number(maxEntries) || 128;
+                      return function() {
+                        var key;
+                        try { key = JSON.stringify(Array.prototype.slice.call(arguments)); }
+                        catch (e) { key = String(arguments.length) + ':' + String(arguments[0]); }
+                        if (cache.has(key)) return cache.get(key);
+                        var res = fn.apply(this, arguments);
+                        cache.set(key, res);
+                        if (cache.size > maxEntries) {
+                          var it = cache.keys().next();
+                          if (!it.done) cache.delete(it.value);
+                        }
+                        return res;
+                      };
+                    }
+
+                    function createBatched(fn, intervalMs) {
+                      if (typeof fn !== 'function') return fn;
+                      var buf = [];
+                      var timer = null;
+                      intervalMs = Number(intervalMs) || 2000;
+                      function flush() {
+                        var batch = buf.splice(0, buf.length);
+                        if (!batch.length) return;
+                        try { fn.call(null, batch); }
+                        catch (e) {
+                          // Fallback: call per event asynchronously
+                          try {
+                            batch.forEach(function(ev){
+                              setTimeout(function(){ try { fn(ev); } catch (_) {} }, 0);
+                            });
+                          } catch (_) {}
+                        }
+                      }
+                      return function(event) {
+                        try {
+                          buf.push(event);
+                          if (!timer) timer = setTimeout(function(){ timer = null; flush(); }, intervalMs);
+                        } catch (e) {}
+                      };
+                    }
+
+                    function patchIfExists(path, wrapper) {
+                      try {
+                        var parts = path.split('.');
+                        var obj = globalThis;
+                        for (var i = 0; i < parts.length - 1; i++) {
+                          obj = obj && obj[parts[i]];
+                        }
+                        if (!obj) return false;
+                        var key = parts[parts.length - 1];
+                        if (typeof obj[key] !== 'function') return false;
+                        obj[key] = wrapper(obj[key]);
+                        return true;
+                      } catch (e) { return false; }
+                    }
+
+                    // Try memoizing a few well-known functions
+                    ['computeHappeningNowState', 'computeNowState'].forEach(function(name){
+                      try { patchIfExists(name, function(orig){ return memoize(orig, 128); }); } catch(_) {}
+                    });
+
+                    // Try caching RowGenerator.prototype.generate by instance signature
+                    try {
+                      var RG = globalThis && globalThis.RowGenerator;
+                      if (RG && RG.prototype && typeof RG.prototype.generate === 'function') {
+                        (function(){
+                          var orig = RG.prototype.generate;
+                          RG.prototype.generate = function() {
+                            try {
+                              var sig;
+                              if (arguments && arguments.length) {
+                                var a0 = arguments[0];
+                                if (Array.isArray(a0)) {
+                                  sig = 'arr:' + a0.length + ':' + a0.slice(0,8).map(function(x){ return x && x.id ? x.id : ''; }).join(',');
+                                } else if (a0 && a0.id) {
+                                  sig = 'id:' + a0.id;
+                                } else {
+                                  try { sig = JSON.stringify(a0).slice(0,200); } catch(e){ sig = String(a0); }
+                                }
+                              } else sig = 'noargs';
+
+                              if (this.__shiggy_sig === sig && typeof this.__shiggy_cache !== 'undefined') {
+                                return this.__shiggy_cache;
+                              }
+                              var res = orig.apply(this, arguments);
+                              this.__shiggy_sig = sig;
+                              this.__shiggy_cache = res;
+                              return res;
+                            } catch (e) { return orig.apply(this, arguments); }
+                          };
+                        })();
+                      }
+                    } catch (e) {}
+
+                    // Batch analytics-like methods (best-effort)
+                    ['app_ui_viewed', 'logEvent', 'Analytics.log', 'Analytics.track', 'analytics.trackEvent'].forEach(function(name){
+                      try {
+                        var parts = name.split('.');
+                        var obj = globalThis;
+                        for (var i = 0; i < parts.length - 1; i++) obj = obj && obj[parts[i]];
+                        if (!obj) return;
+                        var key = parts[parts.length - 1];
+                        if (typeof obj[key] === 'function') obj[key] = createBatched(obj[key], 2000);
+                      } catch (e) {}
+                    });
+
+                    // Make console methods async to avoid blocking hot-paths during startup
+                    (function(){
+                      try {
+                        if (typeof console !== 'undefined') {
+                          ['log','info','warn','error','debug','trace'].forEach(function(m){
+                            try {
+                              if (typeof console[m] === 'function') {
+                                var orig = console[m];
+                                console[m] = function() {
+                                  var args = Array.prototype.slice.call(arguments);
+                                  setTimeout(function(){ try { orig.apply(console, args); } catch(_){} }, 0);
+                                };
+                              }
+                            } catch(e){}
+                          });
+                        }
+                      } catch(e){}
+                    })();
+
+                    // Deduplicate and slightly delay repeated kv calls to reduce IO contention on startup
+                    (function(){
+                      try {
+                        var pending = new Map();
+                        // Lightweight stats for dedupe wrapper to help telemetry/debugging in-case we need to tune delays.
+                        try {
+                          globalThis.__SHIGGY_PERF_DEDUPE_STATS__ = globalThis.__SHIGGY_PERF_DEDUPE_STATS__ || {
+                            methods: {},
+                            totalRequests: 0,
+                            totalHits: 0,
+                            totalMisses: 0,
+                            pending: 0,
+                            lastUpdated: Date.now()
+                          };
+                        } catch(e) {}
+
+                        function _incStats(name, key) {
+                          try {
+                            var s = globalThis.__SHIGGY_PERF_DEDUPE_STATS__;
+                            if (!s) return;
+                            s.lastUpdated = Date.now();
+                            var m = s.methods[name] || (s.methods[name] = { requests: 0, hits: 0, misses: 0, pending: 0 });
+                            if (key === 'requests') { m.requests++; s.totalRequests++; }
+                            else if (key === 'hits') { m.hits++; s.totalHits++; }
+                            else if (key === 'misses') { m.misses++; s.totalMisses++; }
+                            else if (key === 'pending_inc') { m.pending++; s.pending++; }
+                            else if (key === 'pending_dec') { m.pending = Math.max(0, m.pending - 1); s.pending = Math.max(0, s.pending - 1); }
+                          } catch(e) {}
+                        }
+
+                        function wrapAsyncDedupe(kvObj, methodName, delayMs){
+                          try {
+                            var orig = kvObj[methodName];
+                            if (typeof orig !== 'function') return;
+                            kvObj[methodName] = function() {
+                              var argsArr = Array.prototype.slice.call(arguments);
+                              var key;
+                              try { key = JSON.stringify([methodName, argsArr]); } catch(e){ key = methodName + ':' + String(argsArr[0]); }
+                              _incStats(methodName, 'requests');
+                              if (pending.has(key)) { _incStats(methodName, 'hits'); return pending.get(key); }
+                              _incStats(methodName, 'misses');
+                              var self = this;
+                              var p = new Promise(function(resolve, reject){
+                                setTimeout(function(){
+                                  try {
+                                    var res = orig.apply(self, argsArr);
+                                    if (res && typeof res.then === 'function') res.then(resolve, reject);
+                                    else resolve(res);
+                                  } catch (e) { reject(e); }
+                                }, Number(delayMs) || 20);
+                              });
+                              pending.set(key, p);
+                              _incStats(methodName, 'pending_inc');
+                              var cleanup = function(){ pending.delete(key); _incStats(methodName, 'pending_dec'); };
+                              p.then(cleanup, cleanup);
+                              return p;
+                            };
+                          } catch(e){}
+                        }
+                        if (globalThis.kv) {
+                          if (globalThis.kv.get_many) wrapAsyncDedupe(globalThis.kv, 'get_many', 20);
+                          if (globalThis.kv.get_kv_entries) wrapAsyncDedupe(globalThis.kv, 'get_kv_entries', 20);
+                        }
+                      } catch(e){}
+                    })();
+
+                    // Defer heavy filesystem/storage calls slightly to prioritize UI rendering
+                    (function(){
+                      try {
+                        function makeDeferredIfAsync(obj, name, delayMs) {
+                          try {
+                            var orig = obj[name];
+                            if (typeof orig !== 'function') return;
+                            var isAsync = orig.constructor && orig.constructor.name === 'AsyncFunction';
+                            var src = String(orig);
+                            if (!isAsync && src.indexOf('return new Promise') === -1 && src.indexOf('.then(') === -1) {
+                              // Likely synchronous - skip deferral to avoid changing semantics
+                              return;
+                            }
+                            obj[name] = function() {
+                              var args = Array.prototype.slice.call(arguments);
+                              var self = this;
+                              return new Promise(function(resolve, reject){
+                                setTimeout(function(){
+                                  try {
+                                    var res = orig.apply(self, args);
+                                    if (res && typeof res.then === 'function') res.then(resolve, reject);
+                                    else resolve(res);
+                                  } catch (e) { reject(e); }
+                                }, Number(delayMs) || 100);
+                              });
+                            };
+                          } catch(e){}
+                        }
+                        if (globalThis.db && typeof globalThis.db.fs_info === 'function') {
+                          makeDeferredIfAsync(globalThis.db, 'fs_info', 100);
+                        }
+                        if (globalThis.Storage && typeof globalThis.Storage.refresh === 'function') {
+                          makeDeferredIfAsync(globalThis.Storage, 'refresh', 50);
+                        }
+                      } catch(e){}
+                    })();
+
+                    // Expose lightweight API
+                    try {
+                      if (!globalThis.__SHIGGY_PERF_API__) {
+                        globalThis.__SHIGGY_PERF_API__ = {
+                          installedAt: Date.now(),
+                          enabled: true,
+                          uninstall: function() { try { globalThis.__SHIGGY_PERF_API__.enabled = false; } catch(e) {} }
+                        };
+                      }
+                    } catch (e) {}
+
+                  } catch (e) {
+                    try { console && console.warn && console.warn('PerfPatches: error', e); } catch(_) {}
+                  }
+                })();
+            """.trimIndent()
+
+            // Write file if absent or changed
+            try {
+                if (!out.exists() || out.readText() != js) {
+                    out.writeText(js)
+                    Log.i("PerfPatchesModule: wrote patch to " + out.absolutePath)
+                } else {
+                    Log.i("PerfPatchesModule: perf patch already up-to-date")
+                }
+            } catch (e: Throwable) {
+                Log.e("PerfPatchesModule: failed writing patch", e)
+            }
+        } catch (e: Throwable) {
+            Log.e("PerfPatchesModule:onLoad failed", e)
+        }
+    }
+
+    @Deprecated("Overrides deprecated Module.buildPayload")
+    override fun buildPayload(builder: JsonObjectBuilder) {
+        builder.put("perfPatches", true)
+    }
+}
