@@ -1,11 +1,11 @@
-package ShiggyXposed.xposed.modules
+package GoonXposed.xposed.modules
 
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.put
-import ShiggyXposed.xposed.Constants
-import ShiggyXposed.xposed.Module
-import ShiggyXposed.xposed.Utils.Log
+import GoonXposed.xposed.Constants
+import GoonXposed.xposed.Module
+import GoonXposed.xposed.Utils.Log
 import java.io.File
 
 /**
