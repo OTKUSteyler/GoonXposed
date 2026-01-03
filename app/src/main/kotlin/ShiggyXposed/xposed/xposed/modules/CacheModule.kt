@@ -35,7 +35,7 @@ import java.io.*
  */
 object CacheModule : Module() {
 
-    private const val CACHE_DIR = "Goon"
+    private const val CACHE_DIR = "Shiggy"
 
     private const val MODULES_CACHE_PREFIX = "modules"
     private const val ASSETS_CACHE_PREFIX = "assets"
