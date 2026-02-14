@@ -12,8 +12,8 @@ android {
         applicationId = "ShiggyXposed.xposed"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1250
-        versionName = "1.2.5"
+        versionCode = 1320
+        versionName = "1.3.2"
     }
 
     buildTypes {
@@ -52,4 +52,5 @@ dependencies {
     implementation("io.ktor:ktor-client-core:3.3.1")
     implementation("io.ktor:ktor-client-cio:3.3.1")
     implementation("com.google.android.material:material:1.12.0")
+    implementation("dev.rushii:libunbound:1.0.0")
 }
