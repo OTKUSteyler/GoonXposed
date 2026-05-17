@@ -1,4 +1,4 @@
-package ShiggyXposed.xposed.modules.LogBox
+package GoonXposed.xposed.modules.LogBox
 
 import android.app.AlertDialog
 import android.content.Context
@@ -62,7 +62,7 @@ object CustomBundleDialog {
         container.addView(toggleContainer)
 
         val urlInput = EditText(context).apply {
-            hint = "http://localhost:4040/shiggycord.js"
+            hint = "http://localhost:4040/gooncord.js"
             setTextColor(colors.onSurface)
             setHintTextColor(colors.onSurfaceVariant)
             background = LogBoxUtils.createM3Background(context, colors.surfaceVariant, 12f)
