@@ -1,4 +1,4 @@
-package ShiggyXposed.xposed.modules.LogBox
+package GoonXposed.xposed.modules.LogBox
 
 import android.app.AlertDialog
 import android.content.Context
@@ -14,8 +14,8 @@ import android.content.res.ColorStateList
 import android.view.animation.DecelerateInterpolator
 import org.json.JSONObject
 import java.io.File
-import ShiggyXposed.xposed.Utils.Log
-import ShiggyXposed.xposed.Utils
+import GoonXposed.xposed.Utils.Log
+import GoonXposed.xposed.Utils
 
 object LogBoxMenu {
 
@@ -30,7 +30,7 @@ object LogBoxMenu {
             val container = createMenuContainer(context, colors)
 
             // Title
-            container.addView(createTitle(context, colors, "ShiggyXposed Recovery", center = true))
+            container.addView(createTitle(context, colors, "GoonXposed Recovery", center = true))
 
             // Subtitle
             container.addView(createSubtitle(context, colors, "Select an option to continue"))
