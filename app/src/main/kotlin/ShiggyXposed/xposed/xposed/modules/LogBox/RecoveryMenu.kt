@@ -1,9 +1,9 @@
-package ShiggyXposed.xposed.modules.LogBox
+package GoonXposed.xposed.modules.LogBox
 
 import android.app.AlertDialog
 import android.content.Context
 import android.widget.LinearLayout
-import ShiggyXposed.xposed.Utils.Log
+import GoonXposed.xposed.Utils.Log
 
 object RecoveryMenu {
 
@@ -15,7 +15,7 @@ object RecoveryMenu {
 
             val container = LogBoxComponents.createMenuContainer(context, colors)
 
-            container.addView(LogBoxComponents.createTitle(context, colors, "ShiggyXposed Recovery", center = true))
+            container.addView(LogBoxComponents.createTitle(context, colors, "GoonXposed Recovery", center = true))
             container.addView(LogBoxComponents.createSubtitle(context, colors, "Select an option to continue"))
 
             val safeModeText = if (LogBoxUtils.isSafeModeEnabled(context)) "Disable Safe Mode" else "Enable Safe Mode"
@@ -63,7 +63,7 @@ object RecoveryMenu {
             }
 
             2 -> CustomBundleDialog.showCustomBundleDialog(context)
-            3 -> ShiggyXposed.xposed.Utils.Companion.reloadApp()
+            3 -> GoonXposed.xposed.Utils.Companion.reloadApp()
             4 -> showConfirmAction(
                 context,
                 "Clear Cache & Reset",
