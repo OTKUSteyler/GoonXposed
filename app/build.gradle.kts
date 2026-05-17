@@ -12,8 +12,17 @@ android {
         applicationId = "ShiggyXposed.xposed"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1320
-        versionName = "1.3.2"
+        versionCode = 1330
+        versionName = "1.3.3"
+    }
+
+    signingConfigs {
+        create("release") {
+            storeFile = file("../release.keystore")
+            storePassword = "shiggyxposed"
+            keyAlias = "shiggyxposed"
+            keyPassword = "shiggyxposed"
+        }
     }
 
     buildTypes {
@@ -25,6 +34,7 @@ android {
         release {
             isDebuggable = false
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
