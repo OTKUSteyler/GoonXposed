@@ -36,3 +36,5 @@ This project was made possible thanks to the work of:
 · JingMatrix for their LSPosed fork.
 · [cocobo1](https://codeberg.org/cocobo1) for adjusting the Xposed module for Kettu client mod.
 · [Revenge Team](https://github.com/revenge-mod) for making a really good Xposed Module to base of
+
+![OTKUSteyler](https://count.getloli.com/@OTKUSteyler?name=OTKUSteyler&theme=miku&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=1)
