@@ -416,7 +416,7 @@ object LogBoxModule : Module() {
             dialog.show()
             Log.e("Recovery menu shown successfully")
         } catch (e: Exception) {
-            Log.e("Error showing recovery menu: ${e.message}", e)
+            Log.e("Error showing recovery menu: ${e.message}")
             throw e
         }
     }
@@ -640,14 +640,14 @@ object LogBoxModule : Module() {
         val filesDir = File(context.filesDir, "pyoncord")
         val configFile = File(filesDir, "loader.json")
         var currentUrl: String? = null
-        var isEnabled = false
+        var urlEnabled = false
 
         if (configFile.exists()) {
             try {
                 val json = JSONObject(configFile.readText())
                 val customLoadUrl = json.optJSONObject("customLoadUrl")
                 if (customLoadUrl != null) {
-                    isEnabled = customLoadUrl.optBoolean("enabled", false)
+                    urlEnabled = customLoadUrl.optBoolean("enabled", false)
                     currentUrl = customLoadUrl.optString("url", "")
                 }
             } catch (_: Exception) {
@@ -699,7 +699,7 @@ object LogBoxModule : Module() {
             )
         }
 
-        val toggleSwitch = createM3Switch(context, colors, isEnabled)
+        val toggleSwitch = createM3Switch(context, colors, urlEnabled)
 
         toggleContainer.addView(toggleLabel)
         toggleContainer.addView(toggleSwitch)
@@ -719,8 +719,8 @@ object LogBoxModule : Module() {
                 dpToPx(context, 16),
                 dpToPx(context, 12)
             )
-            isEnabled
-            alpha = if (isEnabled) 1f else 0.5f
+            this.isEnabled = urlEnabled
+            alpha = if (urlEnabled) 1f else 0.5f
             val params = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
