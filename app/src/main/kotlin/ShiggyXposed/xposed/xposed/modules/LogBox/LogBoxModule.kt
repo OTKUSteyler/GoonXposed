@@ -1,7 +1,7 @@
-package ShiggyXposed.xposed.modules.LogBox
+package GoonXposed.xposed.modules.LogBox
 
-import ShiggyXposed.xposed.Module
-import ShiggyXposed.xposed.Utils.Log
+import GoonXposed.xposed.Module
+import GoonXposed.xposed.Utils.Log
 import android.content.Context
 import de.robv.android.xposed.XC_MethodReplacement
 import de.robv.android.xposed.XposedBridge
