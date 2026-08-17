@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "ShiggyXposed.xposed"
+    namespace = "GoonXposed.xposed"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "ShiggyXposed.xposed"
+        applicationId = "GoonXposed.xposed"
         minSdk = 24
         targetSdk = 36
         versionCode = 1340
@@ -19,9 +19,9 @@ android {
     signingConfigs {
         create("release") {
             storeFile = file("../release.keystore")
-            storePassword = "shiggyxposed"
-            keyAlias = "shiggyxposed"
-            keyPassword = "shiggyxposed"
+            storePassword = "goonxposed"
+            keyAlias = "goonxposed"
+            keyPassword = "goonxposed"
         }
     }
 
