@@ -1,10 +1,10 @@
-package ShiggyXposed.xposed
+package GoonXposed.xposed
 
 import android.app.AlertDialog
 import android.app.AndroidAppHelper
 import android.content.Context
 import android.content.Intent
-import ShiggyXposed.xposed.modules.UpdaterModule
+import GoonXposed.xposed.modules.UpdaterModule
 import kotlinx.serialization.json.Json
 import java.io.File
 import kotlin.system.exitProcess
@@ -21,7 +21,7 @@ class Utils {
         }
 
         fun showRecoveryAlert(context: Context) {
-            AlertDialog.Builder(context).setTitle("ShiggyCord Recovery Options")
+            AlertDialog.Builder(context).setTitle("GoonCord Recovery Options")
                 .setItems(arrayOf("Reload", "Delete Script", "Reset Loader Config")) { _, which ->
                     when (which) {
                         0 -> {
