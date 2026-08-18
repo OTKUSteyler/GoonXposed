@@ -782,7 +782,7 @@ object LogBoxMenu {
             ) { LogBoxActions.refetchBundle(context) }
 
             2 -> showCustomBundleDialog(context)
-            3 -> ShiggyXposed.xposed.Utils.Companion.reloadApp()
+            3 -> Utils.reloadApp()
             4 -> showConfirmAction(
                 context, "Clear Cache & Reset",
                 "This will clear all cached bundles and reset to default settings."
