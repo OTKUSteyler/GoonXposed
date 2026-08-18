@@ -95,7 +95,7 @@ object LogBoxModule : Module() {
                     XposedBridge.hookMethod(handleReloadJSMethod, object : XC_MethodReplacement() {
                         override fun replaceHookedMethod(param: MethodHookParam): Any? {
                             Log.e("handleReloadJS called - reloading app")
-                            ShiggyXposed.xposed.Utils.Companion.reloadApp()
+                            GoonXposed.xposed.Utils.Companion.reloadApp()
                             return null
                         }
                     })
