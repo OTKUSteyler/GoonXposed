@@ -2,6 +2,7 @@ package GoonXposed.xposed.modules.LogBox
 
 import GoonXposed.xposed.Module
 import GoonXposed.xposed.Utils.Log
+import GoonXposed.xposed.Utils.Companion.reloadApp
 import android.content.Context
 import de.robv.android.xposed.XC_MethodReplacement
 import de.robv.android.xposed.XposedBridge
@@ -95,7 +96,7 @@ object LogBoxModule : Module() {
                     XposedBridge.hookMethod(handleReloadJSMethod, object : XC_MethodReplacement() {
                         override fun replaceHookedMethod(param: MethodHookParam): Any? {
                             Log.e("handleReloadJS called - reloading app")
-                            GoonXposed.xposed.Utils.Companion.reloadApp()
+                            reloadApp()
                             return null
                         }
                     })
