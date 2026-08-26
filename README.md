@@ -1,6 +1,6 @@
 # GoonXposed
 
-GoonXposed is a root Xposed module that injects the ShiggyCord Discord mobile client modifications into the official Discord application.
+GoonXposed is a root Xposed module that injects the GoonCord Discord mobile client modifications into the official Discord application.
 
 ## Info
 *   Injects GoonCord client into the Discord mobile app.
