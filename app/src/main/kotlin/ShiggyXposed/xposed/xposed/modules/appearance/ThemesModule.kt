@@ -43,6 +43,7 @@ object ThemesModule : Module() {
     private const val THEME_FILE = "current-theme.json"
 
 
+    @Deprecated("This method is deprecated in the parent class")
     @ExperimentalSerializationApi
     override fun buildPayload(builder: JsonObjectBuilder) {
         builder.apply {
