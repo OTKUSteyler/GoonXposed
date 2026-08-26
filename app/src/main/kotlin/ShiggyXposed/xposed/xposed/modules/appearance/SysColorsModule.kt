@@ -13,6 +13,7 @@ object SysColorsModule : Module() {
     private lateinit var context: WeakReference<Context>
     private fun isSupported() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
+    @Deprecated("This method is deprecated in the parent class")
     override fun buildPayload(builder: JsonObjectBuilder) {
         context = WeakReference(AndroidAppHelper.currentApplication())
         val accents = arrayOf("accent1", "accent2", "accent3", "neutral1", "neutral2")
