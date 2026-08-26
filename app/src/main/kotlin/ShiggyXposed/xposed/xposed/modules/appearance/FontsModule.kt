@@ -44,6 +44,7 @@ object FontsModule : Module() {
     private lateinit var fontsDownloadsDir: File
     private var fontsAbsPath: String? = null
 
+    @Deprecated("This method is deprecated in the parent class")
     override fun buildPayload(builder: JsonObjectBuilder) {
         builder.apply {
             put("fontPatch", 2)
