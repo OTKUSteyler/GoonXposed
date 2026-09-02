@@ -7,6 +7,7 @@ import android.graphics.fonts.Font
 import android.graphics.fonts.FontFamily
 import android.os.Build
 import de.robv.android.xposed.XC_MethodReplacement
+import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import GoonXposed.xposed.Constants
@@ -51,21 +52,29 @@ object FontsModule : Module() {
     }
 
     override fun onLoad(packageParam: XC_LoadPackage.LoadPackageParam) = with(packageParam) {
-        XposedHelpers.findAndHookMethod(
-            "com.facebook.react.common.assets.ReactFontManager\$Companion",
-            classLoader,
-            "createAssetTypeface",
-            String::class.java,
-            Int::class.java,
-            "android.content.res.AssetManager",
-            object : XC_MethodReplacement() {
-                override fun replaceHookedMethod(param: MethodHookParam): Typeface? {
-                    val fontFamilyName: String = param.args[0].toString()
-                    val style: Int = param.args[1] as Int
-                    val assetManager: AssetManager = param.args[2] as AssetManager
-                    return createAssetTypeface(fontFamilyName, style, assetManager)
-                }
-            })
+        try {
+            XposedHelpers.findAndHookMethod(
+                "com.facebook.react.common.assets.ReactFontManager\$Companion",
+                classLoader,
+                "createAssetTypeface",
+                String::class.java,
+                Int::class.java,
+                "android.content.res.AssetManager",
+                object : XC_MethodReplacement() {
+                    override fun replaceHookedMethod(param: MethodHookParam): Typeface? {
+                        val fontFamilyName: String = param.args[0].toString()
+                        val style: Int = param.args[1] as Int
+                        val assetManager: AssetManager = param.args[2] as AssetManager
+                        return createAssetTypeface(fontFamilyName, style, assetManager)
+                    }
+                })
+            Log.i("Font hook attached successfully (exact signature match)")
+        } catch (e: NoSuchMethodError) {
+            Log.e("Font hook FAILED to attach — method signature mismatch, trying fallback", e)
+            hookByMethodNameFallback(classLoader)
+        } catch (e: Throwable) {
+            Log.e("Font hook FAILED to attach — unexpected error", e)
+        }
 
         val fontDefFile = File(appInfo.dataDir, "${Constants.FILES_DIR}/fonts.json").apply { asFile() }
         if (!fontDefFile.exists()) return@with
@@ -115,6 +124,53 @@ object FontsModule : Module() {
                     }
                 }
             }.awaitAll()
+        }
+    }
+
+    /**
+     * Fallback hook used when the exact-signature hook fails to attach, which usually
+     * means ReactFontManager$Companion.createAssetTypeface's signature changed in this
+     * RN version. Logs the real parameter types found so the exact hook above can be
+     * corrected, and attempts a best-effort reflective hook in the meantime.
+     */
+    private fun hookByMethodNameFallback(classLoader: ClassLoader) {
+        try {
+            val clazz = XposedHelpers.findClass(
+                "com.facebook.react.common.assets.ReactFontManager\$Companion",
+                classLoader
+            )
+            val candidates = clazz.declaredMethods.filter { it.name == "createAssetTypeface" }
+            Log.i(
+                "Found ${candidates.size} candidate method(s) named createAssetTypeface: " +
+                    candidates.joinToString {
+                        it.parameterTypes.joinToString(prefix = "(", postfix = ")") { t -> t.simpleName }
+                    }
+            )
+
+            if (candidates.isEmpty()) {
+                Log.e("No method named createAssetTypeface found on ReactFontManager\$Companion — it may have been renamed or moved to a different class entirely")
+                return
+            }
+
+            candidates.forEach { method ->
+                XposedBridge.hookMethod(method, object : XC_MethodReplacement() {
+                    override fun replaceHookedMethod(param: MethodHookParam): Any? {
+                        Log.i(
+                            "Fallback hook fired with args: " +
+                                param.args.joinToString { it?.javaClass?.simpleName ?: "null" }
+                        )
+                        val fontFamilyName = param.args.filterIsInstance<String>().firstOrNull()
+                            ?: return param.result
+                        val style = param.args.filterIsInstance<Int>().firstOrNull() ?: 0
+                        val assetManager = param.args.filterIsInstance<AssetManager>().firstOrNull()
+                            ?: return param.result
+                        return createAssetTypeface(fontFamilyName, style, assetManager)
+                    }
+                })
+            }
+            Log.i("Fallback font hook(s) attached")
+        } catch (e: Throwable) {
+            Log.e("Fallback font hook also failed — method may have been renamed/moved entirely", e)
         }
     }
 
