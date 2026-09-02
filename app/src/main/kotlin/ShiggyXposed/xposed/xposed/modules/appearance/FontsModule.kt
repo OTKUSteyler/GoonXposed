@@ -9,10 +9,10 @@ import android.os.Build
 import de.robv.android.xposed.XC_MethodReplacement
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
-import GoonXposed.xposed.Constants
-import GoonXposed.xposed.Module
-import GoonXposed.xposed.Utils.Companion.JSON
-import GoonXposed.xposed.Utils.Log
+import ShiggyXposed.xposed.Constants
+import ShiggyXposed.xposed.Module
+import ShiggyXposed.xposed.Utils.Companion.JSON
+import ShiggyXposed.xposed.Utils.Log
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -44,7 +44,6 @@ object FontsModule : Module() {
     private lateinit var fontsDownloadsDir: File
     private var fontsAbsPath: String? = null
 
-    @Deprecated("This method is deprecated in the parent class")
     override fun buildPayload(builder: JsonObjectBuilder) {
         builder.apply {
             put("fontPatch", 2)
