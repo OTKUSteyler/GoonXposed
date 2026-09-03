@@ -123,8 +123,6 @@ object FontsModule : Module() {
     ): Typeface? {
         val fontFamilies: MutableList<FontFamily> = ArrayList()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Iterate over the list of fontFamilyNames, constructing new FontFamily objects
-            // for use in the CustomFallbackBuilder below.
             for (fontFamilyName in fontFamilyNames) {
                 try {
                     for (fileExtension in FILE_EXTENSIONS) {
@@ -149,17 +147,14 @@ object FontsModule : Module() {
                             val family = FontFamily.Builder(font).build()
                             fontFamilies.add(family)
                         } catch (_: RuntimeException) {
-                            // If the typeface asset does not exist, try another extension.
                             continue
                         } catch (_: IOException) {
-                            // If the font asset does not exist, try another extension.
                             continue
                         }
                     }
                 }
             }
 
-            // If there's some problem constructing fonts, fall back to the default behavior.
             if (fontFamilies.isEmpty()) return createAssetTypeface(fontFamilyNames[0], style, assetManager)
 
             val fallbackBuilder = CustomFallbackBuilder(fontFamilies[0])
@@ -174,17 +169,12 @@ object FontsModule : Module() {
     private fun createAssetTypeface(
         fontFamilyName: String, style: Int, assetManager: AssetManager
     ): Typeface? {
-        // This logic attempts to safely check if the frontend code is attempting to use
-        // fallback fonts, and if it is, to use the fallback typeface creation logic.
         var fontFamilyName: String = fontFamilyName
         val fontFamilyNames = fontFamilyName.split(",".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
         for (i in fontFamilyNames.indices) {
             fontFamilyNames[i] = fontFamilyNames[i].trim()
         }
 
-        // If there are multiple font family names:
-        //   For newer versions of Android, construct a Typeface with fallbacks
-        //   For older versions of Android, ignore all the fallbacks and just use the first font family
         if (fontFamilyNames.size > 1) {
             fontFamilyName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 return createAssetTypefaceWithFallbacks(fontFamilyNames, style, assetManager)
@@ -205,8 +195,6 @@ object FontsModule : Module() {
         } catch (_: Throwable) {
         }
 
-        // Lastly, after all those checks above, this is the original RN logic for
-        // getting the typeface.
         for (fontRootPath in arrayOf(fontsAbsPath, FONTS_ASSET_PATH).filterNotNull()) {
             for (fileExtension in FILE_EXTENSIONS) {
                 val fileName =
@@ -217,7 +205,6 @@ object FontsModule : Module() {
                     if (fileName[0] == '/') Typeface.createFromFile(fileName)
                     else Typeface.createFromAsset(assetManager, fileName)
                 } catch (_: RuntimeException) {
-                    // If the typeface asset does not exist, try another extension.
                     continue
                 }
             }
