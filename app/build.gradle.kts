@@ -12,8 +12,8 @@ android {
         applicationId = "GoonXposed.xposed"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1357
-        versionName = "1.3.7"
+        versionCode = 1358
+        versionName = "1.3.8"
     }
 
     signingConfigs {
