@@ -9,6 +9,7 @@ import android.os.Build
 import android.widget.Toast
 import GoonXposed.xposed.Module
 import GoonXposed.xposed.Utils
+import GoonXposed.xposed.getAppInfo
 import java.io.File
 
 object AdditionalBridgeMethodsModule : Module() {

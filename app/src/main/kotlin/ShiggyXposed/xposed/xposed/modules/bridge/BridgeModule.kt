@@ -5,6 +5,8 @@ import GoonXposed.xposed.BuildConfig
 import GoonXposed.xposed.Constants
 import GoonXposed.xposed.Module
 import GoonXposed.xposed.Utils.Log
+import GoonXposed.xposed.hookMethod
+import GoonXposed.xposed.method
 import java.lang.reflect.Method
 
 /**
