@@ -1,5 +1,6 @@
 package GoonXposed.xposed.modules
 
+import GoonXposed.xposed.hookMethod
 import android.content.res.Resources
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import GoonXposed.xposed.Constants.Companion.TARGET_PACKAGE
