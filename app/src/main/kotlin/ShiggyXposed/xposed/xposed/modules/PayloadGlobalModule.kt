@@ -6,8 +6,12 @@ import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import GoonXposed.xposed.BuildConfig
 import GoonXposed.xposed.Constants
+import GoonXposed.xposed.MethodHookBuilder
 import GoonXposed.xposed.Module
 import GoonXposed.xposed.Utils.Companion.JSON
+import GoonXposed.xposed.hook
+import GoonXposed.xposed.method
+import GoonXposed.xposed.safeLoadClass
 import GoonXposed.xposed.modules.HookScriptLoaderModule.PRELOADS_DIR
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put

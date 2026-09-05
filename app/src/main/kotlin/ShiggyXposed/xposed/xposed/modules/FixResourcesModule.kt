@@ -4,6 +4,7 @@ import android.content.res.Resources
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import GoonXposed.xposed.Constants.Companion.TARGET_PACKAGE
 import GoonXposed.xposed.Module
+import GoonXposed.xposed.hookMethod
 
 /**
  * Hooks [Resources.getIdentifier] to fix resource package name mismatch.

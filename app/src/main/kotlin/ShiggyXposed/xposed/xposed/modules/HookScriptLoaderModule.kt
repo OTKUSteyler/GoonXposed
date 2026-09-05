@@ -6,9 +6,15 @@ import de.robv.android.xposed.IXposedHookZygoteInit
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import GoonXposed.xposed.Constants
+import GoonXposed.xposed.HookScope
 import GoonXposed.xposed.HookStateHolder
 import GoonXposed.xposed.Module
 import GoonXposed.xposed.Utils.Log
+import GoonXposed.xposed.asDir
+import GoonXposed.xposed.asFile
+import GoonXposed.xposed.hook
+import GoonXposed.xposed.method
+import GoonXposed.xposed.safeLoadClass
 import GoonXposed.xposed.modules.HookScriptLoaderModule.PRELOADS_DIR
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll

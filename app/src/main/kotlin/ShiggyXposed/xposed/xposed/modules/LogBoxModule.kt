@@ -19,6 +19,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.view.setPadding
+import de.robv.android.xposed.XC_MethodHook.MethodHookParam
 import de.robv.android.xposed.XC_MethodReplacement
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
@@ -26,6 +27,7 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage
 import GoonXposed.xposed.Module
 import GoonXposed.xposed.Utils.Companion.reloadApp
 import GoonXposed.xposed.Utils.Log
+import GoonXposed.xposed.hook
 import kotlinx.coroutines.*
 import org.json.JSONObject
 import java.io.File
