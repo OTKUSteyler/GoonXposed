@@ -76,7 +76,7 @@ object RecoveryMenu {
         }
     }
 
-    private fun showConfirmAction(context: Context, title: String, message: String, action: () -> Unit) {
+    fun showConfirmAction(context: Context, title: String, message: String, action: () -> Unit) {
         val colors = LogBoxTheme.getM3Colors(context)
         val container = LogBoxComponents.createMenuContainer(context, colors)
 

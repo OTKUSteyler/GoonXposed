@@ -19,40 +19,29 @@ object OptionsMenu {
         container.addView(LogBoxComponents.createM3Button(context, injectionText, colors) {
             dialog.dismiss()
             LogBoxActions.toggleBundleInjection(context)
+            GoonXposed.xposed.Utils.Companion.reloadApp()
         })
 
         container.addView(LogBoxComponents.createM3Button(context, "Refetch Bundle", colors) {
             dialog.dismiss()
-            RecoveryMenu::class.java.getDeclaredMethod(
-                "showConfirmAction",
-                Context::class.java,
-                String::class.java,
-                String::class.java,
-                Runnable::class.java
-            ).apply { isAccessible = true }.invoke(
-                null,
+            RecoveryMenu.showConfirmAction(
                 context,
                 "Refetch Bundle",
-                "This will download the latest bundle from Github.",
-                Runnable { LogBoxActions.refetchBundle(context) }
-            )
+                "This will download the latest bundle from Github."
+            ) {
+                LogBoxActions.refetchBundle(context)
+            }
         })
 
         container.addView(LogBoxComponents.createM3Button(context, "Clear Cache & Reset", colors) {
             dialog.dismiss()
-            RecoveryMenu::class.java.getDeclaredMethod(
-                "showConfirmAction",
-                Context::class.java,
-                String::class.java,
-                String::class.java,
-                Runnable::class.java
-            ).apply { isAccessible = true }.invoke(
-                null,
+            RecoveryMenu.showConfirmAction(
                 context,
                 "Clear Cache & Reset",
-                "This will clear all cached bundles and reset to default settings.",
-                Runnable { LogBoxActions.clearCacheAndReset(context) }
-            )
+                "This will clear all cached bundles and reset to default settings."
+            ) {
+                LogBoxActions.clearCacheAndReset(context)
+            }
         })
 
         container.addView(LogBoxComponents.createM3Button(context, "Back", colors) {

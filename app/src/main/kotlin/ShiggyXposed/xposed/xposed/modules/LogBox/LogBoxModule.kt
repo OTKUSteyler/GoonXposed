@@ -3,7 +3,9 @@ package GoonXposed.xposed.modules.LogBox
 import GoonXposed.xposed.Module
 import GoonXposed.xposed.Utils.Log
 import GoonXposed.xposed.Utils.Companion.reloadApp
+import GoonXposed.xposed.hook
 import android.content.Context
+import de.robv.android.xposed.XC_MethodHook.MethodHookParam
 import de.robv.android.xposed.XC_MethodReplacement
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
