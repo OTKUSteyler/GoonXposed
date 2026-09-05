@@ -79,8 +79,9 @@ object FontsModule : Module() {
             return@with
         }
 
+        val fontName = fontDef.name ?: return@with
         fontsDownloadsDir = File(appInfo.dataDir, "${Constants.FILES_DIR}/downloads/fonts").apply { asDir() }
-        fontsDir = File(fontsDownloadsDir, fontDef.name!!).apply { asDir() }
+        fontsDir = File(fontsDownloadsDir, fontName).apply { asDir() }
         fontsAbsPath = fontsDir.absolutePath + "/"
 
         fontsDir.listFiles()?.forEach { file ->
@@ -164,7 +165,7 @@ object FontsModule : Module() {
                             // If the typeface asset does not exist, try another extension.
                             continue
                         } catch (_: IOException) {
-                            // If the font asset does not exist, try another extension.
+                            // If the typeface asset does not exist, try another extension.
                             continue
                         }
                     }
