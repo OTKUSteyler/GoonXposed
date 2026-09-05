@@ -16,6 +16,7 @@ import GoonXposed.xposed.modules.bridge.AdditionalBridgeMethodsModule
 import GoonXposed.xposed.modules.bridge.BridgeModule
 import GoonXposed.xposed.modules.no_track.BlockCrashReportingModule
 import GoonXposed.xposed.modules.no_track.BlockDeepLinksTrackingModule
+import GoonXposed.xposed.modules.LogBox.LogBoxModule
 import kotlinx.coroutines.CompletableDeferred
 
 object HookStateHolder {
