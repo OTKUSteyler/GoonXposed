@@ -1,9 +1,10 @@
 package GoonXposed.xposed
 
 import android.app.AlertDialog
+import android.app.Application
 import android.content.Context
 import android.content.Intent
-import de.robv.android.xposed.AndroidAppHelper
+import de.robv.android.xposed.XposedHelpers
 import GoonXposed.xposed.modules.UpdaterModule
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -14,7 +15,9 @@ class Utils {
         val JSON = Json { ignoreUnknownKeys = true }
 
         fun reloadApp() {
-            val application = AndroidAppHelper.currentApplication()
+            val activityThread = XposedHelpers.findClass("android.app.ActivityThread", null)
+            val application =
+                XposedHelpers.callStaticMethod(activityThread, "currentApplication") as? Application ?: return
             val intent = application.packageManager.getLaunchIntentForPackage(application.packageName)
             application.startActivity(Intent.makeRestartActivityTask(intent!!.component))
             exitProcess(0)
@@ -50,4 +53,3 @@ class Utils {
         fun w(msg: String) = android.util.Log.w(Constants.LOG_TAG, msg)
         fun w(msg: String, throwable: Throwable) = android.util.Log.w(Constants.LOG_TAG, msg, throwable)
     }
-}
