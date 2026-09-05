@@ -60,11 +60,11 @@ object HookScriptLoaderModule : Module() {
 
     private fun hook(instance: Class<*>) = runCatching {
         val loadScriptFromAssets = instance.method(
-            "loadScriptFromAssets", AssetManager::class.java, String::class.java, Boolean::class.javaPrimitiveType
+            "loadScriptFromAssets", AssetManager::class.java, String::class.java, Boolean::class.javaPrimitiveType!!
         )
 
         val loadScriptFromFile = instance.method(
-            "loadScriptFromFile", String::class.java, String::class.java, Boolean::class.javaPrimitiveType
+            "loadScriptFromFile", String::class.java, String::class.java, Boolean::class.javaPrimitiveType!!
         )
 
         loadScriptFromAssets.hook {
@@ -113,14 +113,10 @@ object HookScriptLoaderModule : Module() {
         }
 
         try {
-            // If a disabled marker exists next to the cached bundle, treat this as a global
-            // disable for the entire script-loading step. In that case, we skip preloads,
-            // cached main script and the assets fallback so nothing is injected.
             val disabledMarker = File(mainScript.parentFile, "${Constants.MAIN_SCRIPT_FILE}.disabled")
             if (disabledMarker.exists()) {
                 Log.i("Script loading disabled by marker; skipping preloads, cached bundle and fallback")
             } else {
-                // Normal behaviour: run preloads then cached main script or fallback to bundled asset
                 preloadsDir.walk().filter { it.isFile }.forEach(runScriptFile)
 
                 if (mainScript.exists()) {
