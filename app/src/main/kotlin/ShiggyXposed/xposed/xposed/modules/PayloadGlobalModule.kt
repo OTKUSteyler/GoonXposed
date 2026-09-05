@@ -52,7 +52,7 @@ class PayloadGlobalModule(private val modules: List<Module>) : Module() {
                             "loadScriptFromFile",
                             String::class.java,
                             String::class.java,
-                            Boolean::class.javaPrimitiveType
+                            Boolean::class.javaPrimitiveType!!
                         ), param.thisObject, arrayOf(absolutePath, absolutePath, param.args[2])
                     )
 
@@ -74,11 +74,11 @@ class PayloadGlobalModule(private val modules: List<Module>) : Module() {
 
     private fun hook(instance: Class<*>, hook: XC_MethodHook) {
         instance.method(
-            "loadScriptFromAssets", AssetManager::class.java, String::class.java, Boolean::class.javaPrimitiveType,
+            "loadScriptFromAssets", AssetManager::class.java, String::class.java, Boolean::class.javaPrimitiveType!!,
         ).hook(hook)
 
         instance.method(
-            "loadScriptFromFile", String::class.java, String::class.java, Boolean::class.javaPrimitiveType
+            "loadScriptFromFile", String::class.java, String::class.java, Boolean::class.javaPrimitiveType!!
         ).hook(hook)
     }
 }
