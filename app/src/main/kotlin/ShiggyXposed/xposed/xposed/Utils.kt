@@ -1,9 +1,9 @@
 package GoonXposed.xposed
 
 import android.app.AlertDialog
-import android.app.AndroidAppHelper
 import android.content.Context
 import android.content.Intent
+import de.robv.android.xposed.AndroidAppHelper
 import GoonXposed.xposed.modules.UpdaterModule
 import kotlinx.serialization.json.Json
 import java.io.File
