@@ -6,6 +6,7 @@ import android.graphics.Typeface.CustomFallbackBuilder
 import android.graphics.fonts.Font
 import android.graphics.fonts.FontFamily
 import android.os.Build
+import de.robv.android.xposed.XC_MethodHook.MethodHookParam
 import de.robv.android.xposed.XC_MethodReplacement
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
@@ -13,6 +14,8 @@ import GoonXposed.xposed.Constants
 import GoonXposed.xposed.Module
 import GoonXposed.xposed.Utils.Companion.JSON
 import GoonXposed.xposed.Utils.Log
+import GoonXposed.xposed.asDir
+import GoonXposed.xposed.asFile
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -118,6 +121,15 @@ object FontsModule : Module() {
         }
     }
 
+    private fun splitFontName(fontFamilyName: String): Pair<String, String> {
+        val parts = fontFamilyName.split(":")
+        return if (parts.size >= 2) parts[0] to parts[1] else "" to fontFamilyName
+    }
+
+    private fun fontFileFor(customName: String, refName: String, fileExtension: String): File =
+        if (customName.isEmpty()) File(fontsDownloadsDir, "$refName.$fileExtension")
+        else File(fontsDownloadsDir, "$customName/$refName.$fileExtension")
+
     private fun createAssetTypefaceWithFallbacks(
         fontFamilyNames: Array<String>, style: Int, assetManager: AssetManager
     ): Typeface? {
@@ -128,8 +140,8 @@ object FontsModule : Module() {
             for (fontFamilyName in fontFamilyNames) {
                 try {
                     for (fileExtension in FILE_EXTENSIONS) {
-                        val (customName, refName) = fontFamilyName.split(":")
-                        val file = File(fontsDownloadsDir, "$customName/$refName.$fileExtension").apply { asFile() }
+                        val (customName, refName) = splitFontName(fontFamilyName)
+                        val file = fontFileFor(customName, refName, fileExtension).apply { asFile() }
                         val font = Font.Builder(file).build()
                         val family = FontFamily.Builder(font).build()
                         fontFamilies.add(family)
@@ -197,8 +209,8 @@ object FontsModule : Module() {
 
         try {
             for (fileExtension in FILE_EXTENSIONS) {
-                val (customName, refName) = fontFamilyName.split(":")
-                val file = File(fontsDownloadsDir, "$customName/$refName.$fileExtension").apply { asFile() }
+                val (customName, refName) = splitFontName(fontFamilyName)
+                val file = fontFileFor(customName, refName, fileExtension).apply { asFile() }
                 if (!file.exists()) throw Exception()
                 return Typeface.createFromFile(file.absolutePath)
             }

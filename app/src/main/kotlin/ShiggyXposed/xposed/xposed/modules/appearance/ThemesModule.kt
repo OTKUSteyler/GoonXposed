@@ -5,8 +5,12 @@ import android.content.res.Resources
 import androidx.core.graphics.toColorInt
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import GoonXposed.xposed.Constants
+import GoonXposed.xposed.MethodHookBuilder
 import GoonXposed.xposed.Module
 import GoonXposed.xposed.Utils.Companion.JSON
+import GoonXposed.xposed.asFile
+import GoonXposed.xposed.hook
+import GoonXposed.xposed.method
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObjectBuilder
