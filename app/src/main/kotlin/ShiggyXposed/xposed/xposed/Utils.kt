@@ -53,3 +53,4 @@ class Utils {
         fun w(msg: String) = android.util.Log.w(Constants.LOG_TAG, msg)
         fun w(msg: String, throwable: Throwable) = android.util.Log.w(Constants.LOG_TAG, msg, throwable)
     }
+}
