@@ -4,6 +4,8 @@ import android.content.Context
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import GoonXposed.xposed.Module
 import GoonXposed.xposed.Utils.Log
+import GoonXposed.xposed.hookMethod
+import GoonXposed.xposed.safeLoadClass
 
 /**
  * Hooks Discord's deep links tracking to disable AppsFlyer initialization.
