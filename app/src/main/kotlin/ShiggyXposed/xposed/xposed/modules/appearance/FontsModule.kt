@@ -10,7 +10,7 @@ import android.graphics.fonts.FontFamily
 import android.os.Build
 import GoonXposed.Logger
 import GoonXposed.xposed.*
-import GoonXposed.xposed.tweaks.PayloadBuilder
+import GoonXposed.xposed.tweaks.GoonXposedPayloadBuilder
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -32,12 +32,12 @@ data class FontDefinition(
 /**
  * Custom font loading + ReactFontManager hijack.
  */
-val fonts by tweak {
+val fonts by goonXposedTweak {
     val log: Logger = this.log
 
-    PayloadBuilder.contribute { put("fontPatch", 2) }
+    GoonXposedPayloadBuilder.contribute { put("fontPatch", 2) }
 
-    // ReactFontManager hijack runs regardless of fonts.json presence  it falls back to the default Typeface chain if no custom font file is found.
+    // ReactFontManager hijack runs regardless of fonts.json presence - it falls back to the default Typeface chain if no custom font file is found.
     listOf(
         "com.facebook.react.common.assets.ReactFontManager\$Companion",
         "com.facebook.react.views.text.ReactFontManager\$Companion",
@@ -58,18 +58,18 @@ val fonts by tweak {
 
     withAppContext { ctx ->
         val dataDir = ctx.dataDir.absolutePath
-        val fontDefFile = File(dataDir, "${Constants.FILES_DIR}/fonts.json").apply { ensureFile() }
+        val fontDefFile = File(dataDir, "${GoonXposedConstants.FILES_DIR}/fonts.json").apply { ensureFile() }
         if (!fontDefFile.exists()) return@withAppContext
 
         val fontDef = try {
-            Json.decodeFromString<FontDefinition>(fontDefFile.readText())
+            GoonXposedJson.decodeFromString<FontDefinition>(fontDefFile.readText())
         } catch (e: Throwable) {
             log.w("fonts.json malformed: ${e.message}")
             return@withAppContext
         }
         val setName = fontDef.name ?: return@withAppContext
 
-        val downloadsDir = File(dataDir, "${Constants.FILES_DIR}/downloads/fonts").apply { ensureDir() }
+        val downloadsDir = File(dataDir, "${GoonXposedConstants.FILES_DIR}/downloads/fonts").apply { ensureDir() }
         val setDir = File(downloadsDir, setName).apply { ensureDir() }
         FontsState.fontsDownloadsDir = downloadsDir
         FontsState.fontsAbsPath = setDir.absolutePath + "/"
@@ -86,7 +86,7 @@ val fonts by tweak {
             }
         }
 
-        CoroutineScope(Dispatchers.IO).launch {
+        GoonXposedScope(Dispatchers.IO).launch {
             fontDef.main.entries.map { (name, url) ->
                 async {
                     try {
@@ -94,7 +94,7 @@ val fonts by tweak {
                         val ext = FontsState.FILE_EXTENSIONS.firstOrNull { url.endsWith(it) } ?: ".ttf"
                         val file = File(setDir, "$name$ext").apply { ensureFile() }
                         if (file.exists()) return@async
-                        val response: HttpResponse = httpClient.get(url)
+                        val response: HttpResponse = goonXposedClient.get(url)
                         if (response.status == HttpStatusCode.OK) {
                             file.writeBytes(response.body())
                         }
