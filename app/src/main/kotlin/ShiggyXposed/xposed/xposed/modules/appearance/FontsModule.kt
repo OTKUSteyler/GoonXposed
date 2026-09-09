@@ -32,7 +32,7 @@ data class FontDefinition(
 /**
  * Custom font loading + ReactFontManager hijack.
  */
-val fonts by goonXposedTweak {
+val fonts by GoonXposedTweak {
     val log: Logger = this.log
 
     GoonXposedPayloadBuilder.contribute { put("fontPatch", 2) }
@@ -94,7 +94,7 @@ val fonts by goonXposedTweak {
                         val ext = FontsState.FILE_EXTENSIONS.firstOrNull { url.endsWith(it) } ?: ".ttf"
                         val file = File(setDir, "$name$ext").apply { ensureFile() }
                         if (file.exists()) return@async
-                        val response: HttpResponse = goonXposedClient.get(url)
+                        val response: HttpResponse = GoonXposedClient.get(url)
                         if (response.status == HttpStatusCode.OK) {
                             file.writeBytes(response.body())
                         }
