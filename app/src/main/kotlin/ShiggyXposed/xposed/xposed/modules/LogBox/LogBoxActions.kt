@@ -134,7 +134,7 @@ object LogBoxActions {
                     val config = JSONObject(configFile.readText())
                     val customLoadUrl = config.optJSONObject("customLoadUrl") ?: JSONObject()
                     customLoadUrl.put("enabled", false)
-                    customLoadUrl.put("url", "http://localhost:4040/shiggycord.js")
+                    customLoadUrl.put("url", "http://localhost:4040/gooncord.js")
                     config.put("customLoadUrl", customLoadUrl)
                     configFile.writeText(config.toString())
                 }
