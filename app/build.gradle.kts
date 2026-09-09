@@ -36,7 +36,7 @@ android {
         }
         release {
             isDebuggable = false
-            isMinifyEnabled = true
+            isMinifyEnabled = false
             val keystoreFile = file("../release.keystore")
             if (keystoreFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
