@@ -58,7 +58,7 @@ val fonts by GoonXposedTweak {
 
     withAppContext { ctx ->
         val dataDir = ctx.dataDir.absolutePath
-        val fontDefFile = File(dataDir, "${GoonXposedConstants.FILES_DIR}/fonts.json").apply { ensureFile() }
+        val fontDefFile = File(dataDir, "${GoonXposedConstants.FILES_DIR}/fonts.json")
         if (!fontDefFile.exists()) return@withAppContext
 
         val fontDef = try {
@@ -92,8 +92,9 @@ val fonts by GoonXposedTweak {
                     try {
                         log.i("Downloading $name from $url")
                         val ext = FontsState.FILE_EXTENSIONS.firstOrNull { url.endsWith(it) } ?: ".ttf"
-                        val file = File(setDir, "$name$ext").apply { ensureFile() }
+                        val file = File(setDir, "$name$ext")
                         if (file.exists()) return@async
+                        file.ensureFile()
                         val response: HttpResponse = GoonXposedClient.get(url)
                         if (response.status == HttpStatusCode.OK) {
                             file.writeBytes(response.body())
@@ -146,7 +147,7 @@ private object FontsState {
                 if (split.size != 2) break
                 val (customName, refName) = split
                 val downloads = fontsDownloadsDir ?: break
-                val file = File(downloads, "$customName/$refName.$fileExt").apply { ensureFile() }
+                val file = File(downloads, "$customName/$refName.$fileExt")
                 if (!file.exists()) continue
                 return Typeface.createFromFile(file.absolutePath)
             }
@@ -181,7 +182,7 @@ private object FontsState {
                     if (split.size != 2) break
                     val (customName, refName) = split
                     val downloads = fontsDownloadsDir ?: break
-                    val file = File(downloads, "$customName/$refName.$fileExt").apply { ensureFile() }
+                    val file = File(downloads, "$customName/$refName.$fileExt")
                     if (!file.exists()) continue
                     val font = Font.Builder(file).build()
                     fontFamilies.add(FontFamily.Builder(font).build())
