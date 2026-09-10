@@ -2,92 +2,108 @@ package GoonXposed.xposed
 
 import android.app.Activity
 import android.content.Context
-import android.content.pm.ApplicationInfo
+import android.content.ContextWrapper
+import android.os.Bundle
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.IXposedHookZygoteInit
 import de.robv.android.xposed.callbacks.XC_LoadPackage
-import GoonXposed.bridge.GoonBridge
-import GoonXposed.xposed.api.HostScope
-import GoonXposed.xposed.tweaks.*
-import GoonXposed.xposed.tweaks.base.lifecycleSupport
-import GoonXposed.xposed.tweaks.base.scriptLoader
-import GoonXposed.xposed.tweaks.bridge.GoonBridgeRegistry
-import GoonXposed.xposed.tweaks.bridge.additionalBridgeMethods
-import GoonXposed.xposed.tweaks.bridge.goonBridgeSupport
-import GoonXposed.xposed.tweaks.legacy.appearance.fonts
-import GoonXposed.xposed.tweaks.legacy.appearance.sysColors
-import GoonXposed.xposed.tweaks.legacy.appearance.themes
-import GoonXposed.xposed.tweaks.legacy.goonPayloadGlobal
-import GoonXposed.xposed.tweaks.discordVersionRetriever
-import GoonXposed.xposed.tweaks.plugins.pluginLoader
-import GoonXposed.xposed.tweaks.plugins.pluginStates
-import GoonXposed.xposed.tweaks.plugins.repos.pluginRepos
+import GoonXposed.xposed.Utils.Log
+import GoonXposed.xposed.modules.*
+import GoonXposed.xposed.modules.appearance.FontsModule
+import GoonXposed.xposed.modules.appearance.SysColorsModule
+import GoonXposed.xposed.modules.appearance.ThemesModule
+import GoonXposed.xposed.modules.bridge.AdditionalBridgeMethodsModule
+import GoonXposed.xposed.modules.bridge.BridgeModule
+import GoonXposed.xposed.modules.no_track.BlockCrashReportingModule
+import GoonXposed.xposed.modules.no_track.BlockDeepLinksTrackingModule
+import GoonXposed.xposed.modules.LogBox.*
+import kotlinx.coroutines.CompletableDeferred
 
-private lateinit var modulePath: String
+object HookStateHolder {
+    /**
+     * Whether all hooks are completed, and we are ready to load the JS bundle.
+     */
+    val readyDeferred = CompletableDeferred<Unit>()
 
-@Suppress("UNUSED")
-class Main : IXposedHookLoadPackage, IXposedHookZygoteInit {
+    /**
+     * Whether we have successfully received a [Context] yet.
+     * Sometimes the app process is recreated and Xposed hooks way too late for us to get [Context] from [ContextWrapper.attachBaseContext].
+     * But since Xposed hooks before [Activity.onCreate], we can still get it from there and still initialize properly.
+     */
     @Volatile
-    private var hooked = false
-
-    private val tweaks: List<TweakSpec> = listOf(
-        // Framework
-        lifecycleSupport,
-        goonBridgeSupport,
-        scriptLoader,
-        discordVersionRetriever,
-
-        // Static patches
-        fixResources,
-
-        // Persistence
-        caches,
-        pluginStates,
-        pluginRepos,
-
-        // Async updater
-        goonUpdater,
-
-        // Consumers
-        discordDevSupport,
-        additionalBridgeMethods,
-        fonts,
-        themes,
-        sysColors,
-        pluginLoader,
-        goonScriptLoader,
-        goonPayloadGlobal,
-    )
-
-    override fun initZygote(startupParam: IXposedHookZygoteInit.StartupParam) {
-        modulePath = startupParam.modulePath
-    }
-
-    override fun handleLoadPackage(param: XC_LoadPackage.LoadPackageParam) {
-        // Only hook the main process.
-        // Discord uses ProcessPhoenix to spawn a ":phoenix" process to restart the app. It will cause concurrency issues.
-        if (param.processName != param.packageName) return
-
-        if (hooked) return
-        hooked = true
-
-        val ctx = HostScopeImpl(
-            modulePath = modulePath,
-            appInfo = param.appInfo,
-            classLoader = param.classLoader,
-        )
-        for (spec in tweaks) spec.applyTo(ctx)
-    }
+    var gotContext = false
 }
 
-private class HostScopeImpl(
-    override val modulePath: String,
-    override val appInfo: ApplicationInfo,
-    override val classLoader: ClassLoader,
-) : HostScope {
-    override val bridge: GoonBridge get() = GoonBridgeRegistry
-    override fun withAppContext(block: (Context) -> Unit) =
-        GoonXposed.xposed.tweaks.base.withAppContext(block)
-    override fun withAppActivity(block: (Activity) -> Unit) =
-        GoonXposed.xposed.tweaks.base.withAppActivity(block)
+class Main : Module(), IXposedHookLoadPackage, IXposedHookZygoteInit {
+    private var hooked = false
+    private val modules = mutableListOf(
+        HookScriptLoaderModule,
+        BridgeModule,
+        AdditionalBridgeMethodsModule,
+        PluginsModule(),
+        UpdaterModule,
+        FixResourcesModule,
+        BlockDeepLinksTrackingModule,
+        BlockCrashReportingModule,
+        LogBoxModule,
+        CacheModule,
+        PerfPatchesModule,
+        FontsModule,
+        ThemesModule,
+        SysColorsModule
+    )
+
+    init {
+        modules += PayloadGlobalModule(modules)
+    }
+
+    override fun initZygote(startupParam: IXposedHookZygoteInit.StartupParam) {
+        for (module in modules) module.onInit(startupParam)
+    }
+
+    override fun handleLoadPackage(param: XC_LoadPackage.LoadPackageParam) = with(param) {
+        if (hooked) return
+
+        val reactActivity = classLoader.loadClass(Constants.TARGET_ACTIVITY)
+
+        ContextWrapper::class.java.hookMethod("attachBaseContext", Context::class.java) {
+            after {
+                val ctx = args[0] as Context
+                HookStateHolder.gotContext = true
+                Log.i("Received Context")
+                this@Main.onContext(ctx)
+            }
+        }
+
+        reactActivity.hookMethod("onCreate", Bundle::class.java) {
+            after {
+                val act = thisObject as Activity
+                Log.i("Received Activity")
+
+                if (!HookStateHolder.gotContext) {
+                    Log.w("Activity created before we got Context, process may have been recreated!")
+                    this@Main.onContext(act.applicationContext)
+                }
+
+                this@Main.onActivity(act)
+                HookStateHolder.readyDeferred.complete(Unit)
+            }
+        }
+
+        this@Main.onLoad(param)
+
+        hooked = true
+    }
+
+    override fun onLoad(packageParam: XC_LoadPackage.LoadPackageParam) {
+        for (module in modules) module.onLoad(packageParam)
+    }
+
+    override fun onContext(context: Context) {
+        for (module in modules) module.onContext(context)
+    }
+
+    override fun onActivity(activity: Activity) {
+        for (module in modules) module.onActivity(activity)
+    }
 }
