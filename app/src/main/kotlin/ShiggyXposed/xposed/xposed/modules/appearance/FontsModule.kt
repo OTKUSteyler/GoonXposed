@@ -1,31 +1,35 @@
-@file:Suppress("DEPRECATION")
-
 package GoonXposed.xposed.modules.appearance
 
-import android.content.Context
 import android.content.res.AssetManager
 import android.graphics.Typeface
 import android.graphics.Typeface.CustomFallbackBuilder
 import android.graphics.fonts.Font
 import android.graphics.fonts.FontFamily
 import android.os.Build
+import de.robv.android.xposed.callbacks.XC_LoadPackage
 import GoonXposed.xposed.Constants
 import GoonXposed.xposed.Module
 import GoonXposed.xposed.Utils.Companion.JSON
 import GoonXposed.xposed.Utils.Log
-import GoonXposed.xposed.hookMethod
+import GoonXposed.xposed.asDir
+import GoonXposed.xposed.asFile
+import GoonXposed.xposed.hook
+import GoonXposed.xposed.method
 import GoonXposed.xposed.safeLoadClass
-import de.robv.android.xposed.callbacks.XC_LoadPackage
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import kotlinx.coroutines.*
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpRedirect
+import io.ktor.client.plugins.UserAgent
+import io.ktor.client.request.get
+import io.ktor.client.statement.HttpResponse
+import io.ktor.http.HttpStatusCode
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObjectBuilder
-import kotlinx.serialization.json.put
 import java.io.File
 import java.io.IOException
 
@@ -34,22 +38,15 @@ data class FontDefinition(
     val name: String? = null,
     val description: String? = null,
     val spec: Int? = null,
-    val main: Map<String, String> = emptyMap(),
+    val main: Map<String, String>,
 )
 
 /**
  * Custom font loading + ReactFontManager hijack.
  */
 object FontsModule : Module() {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-    @Deprecated("This method is deprecated in the parent class")
-    override fun buildPayload(builder: JsonObjectBuilder) {
-        builder.put("fontPatch", 2)
-    }
-
     override fun onLoad(packageParam: XC_LoadPackage.LoadPackageParam) = with(packageParam) {
-        // ReactFontManager hijack runs regardless of fonts.json presence - it falls back to the
+        // ReactFontManager hijack runs regardless of fonts.json presence; it falls back to the
         // default Typeface chain if no custom font file is found.
         listOf(
             "com.facebook.react.common.assets.ReactFontManager\$Companion",
@@ -57,12 +54,7 @@ object FontsModule : Module() {
         ).forEach { clsName ->
             classLoader.safeLoadClass(clsName)?.let { cls ->
                 runCatching {
-                    cls.hookMethod(
-                        "createAssetTypeface",
-                        String::class.java,
-                        Int::class.java,
-                        AssetManager::class.java
-                    ) {
+                    cls.method("createAssetTypeface", String::class.java, Int::class.java, AssetManager::class.java).hook {
                         before {
                             val fontFamilyName: String = args[0].toString()
                             val style: Int = args[1] as Int
@@ -70,14 +62,16 @@ object FontsModule : Module() {
                             result = FontsState.createAssetTypeface(fontFamilyName, style, assetManager)
                         }
                     }
+                }.onFailure { e ->
+                    Log.e("Failed to hook ReactFontManager: ${e.message}")
                 }
             }
         }
     }
 
-    override fun onContext(context: Context) {
+    override fun onContext(context: android.content.Context) {
         val dataDir = context.dataDir.absolutePath
-        val fontDefFile = File(dataDir, "${Constants.FILES_DIR}/fonts.json")
+        val fontDefFile = File(dataDir, "${Constants.FILES_DIR}/fonts.json").asFile()
         if (!fontDefFile.exists()) return
 
         val fontDef = try {
@@ -88,8 +82,8 @@ object FontsModule : Module() {
         }
         val setName = fontDef.name ?: return
 
-        val downloadsDir = File(dataDir, "${Constants.FILES_DIR}/downloads/fonts").apply { mkdirs() }
-        val setDir = File(downloadsDir, setName).apply { mkdirs() }
+        val downloadsDir = File(dataDir, "${Constants.FILES_DIR}/downloads/fonts").asDir()
+        val setDir = File(downloadsDir, setName).asDir()
         FontsState.fontsDownloadsDir = downloadsDir
         FontsState.fontsAbsPath = setDir.absolutePath + "/"
 
@@ -105,34 +99,32 @@ object FontsModule : Module() {
             }
         }
 
-        scope.launch {
-            HttpClient(CIO) {
-                expectSuccess = false
-            }.use { client ->
-                fontDef.main.entries.map { (name, url) ->
-                    async {
-                        try {
-                            Log.i("Downloading $name from $url")
-                            val ext = FontsState.FILE_EXTENSIONS.firstOrNull { url.endsWith(it) } ?: ".ttf"
-                            val file = File(setDir, "$name$ext")
-                            if (file.exists()) return@async
-                            val response: HttpResponse = client.get(url)
-                            if (response.status == HttpStatusCode.OK) {
-                                file.writeBytes(response.body())
-                            }
-                        } catch (e: Throwable) {
-                            Log.e("Failed to download font ($name from $url)", e)
+        CoroutineScope(Dispatchers.IO).launch {
+            fontDef.main.entries.map { (name, url) ->
+                async {
+                    try {
+                        Log.i("Downloading $name from $url")
+                        val ext = FontsState.FILE_EXTENSIONS.firstOrNull { url.endsWith(it) } ?: ".ttf"
+                        val file = File(setDir, "$name$ext").asFile()
+                        if (file.exists()) return@async
+                        val response: HttpResponse = HttpClient(CIO) {
+                            install(UserAgent) { agent = Constants.USER_AGENT }
+                            install(HttpRedirect) {}
+                        }.use { it.get(url) }
+                        if (response.status == HttpStatusCode.OK) {
+                            file.writeBytes(response.body())
                         }
+                    } catch (e: Throwable) {
+                        Log.e("Failed to download font ($name from $url)", e)
                     }
-                }.awaitAll()
-            }
+                }
+            }.awaitAll()
         }
     }
 }
 
 /**
- * Holds the per-process font-state used by the `createAssetTypeface` hijack. Mirrors the static
- * fields of the old `FontsModule`.
+ * Holds the per-process font-state used by the `createAssetTypeface` hijack.
  */
 private object FontsState {
     val EXTENSIONS = arrayOf("", "_bold", "_italic", "_bold_italic")
