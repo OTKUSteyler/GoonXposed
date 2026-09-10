@@ -5,7 +5,6 @@ import GoonXposed.xposed.Utils.Log
 import GoonXposed.xposed.hook
 import android.content.Context
 import de.robv.android.xposed.XC_MethodHook.MethodHookParam
-import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XC_MethodReplacement
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
@@ -92,19 +91,6 @@ object LogBoxModule : Module() {
         }
 
         try {
-            try {
-                val handleReloadJSMethod = clazz.methods.firstOrNull { it.name == "handleReloadJS" }
-                if (handleReloadJSMethod != null) {
-                    XposedBridge.hookMethod(handleReloadJSMethod, object : XC_MethodHook() {
-                        override fun beforeHookedMethod(param: MethodHookParam) {
-                            Log.e("handleReloadJS called")
-                        }
-                    })
-                }
-            } catch (e: Exception) {
-                Log.e("Failed to hook handleReloadJS: ${e.message}")
-            }
-
             try {
                 val showDevOptionsDialogMethod = clazz.methods.firstOrNull { it.name == "showDevOptionsDialog" }
                 if (showDevOptionsDialogMethod != null) {
