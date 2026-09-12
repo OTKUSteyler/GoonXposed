@@ -29,6 +29,14 @@ import kotlinx.serialization.json.put
 import java.io.File
 import java.io.IOException
 
+// NOTE: These extensions used to be resolved from a shared Utils/Extensions file,
+// but that reference broke (renamed/removed/relocated), causing "Unresolved reference"
+// build failures. Defining them locally here removes the dependency on that file.
+// asFile(): ensures the parent directory of a file exists.
+// asDir(): ensures the directory itself exists.
+private fun File.asFile(): File = apply { parentFile?.mkdirs() }
+private fun File.asDir(): File = apply { mkdirs() }
+
 @Serializable
 data class FontDefinition(
     val name: String? = null,
