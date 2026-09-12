@@ -27,6 +27,10 @@ open class Module {
 
     open fun onActivity(activity: Activity) {}
 
+    open fun onResume(activity: Activity) {}
+
+    open fun onPause(activity: Activity) {}
+
     @Deprecated("This method is deprecated in the parent class")
     open fun buildPayload(builder: JsonObjectBuilder) {}
 }

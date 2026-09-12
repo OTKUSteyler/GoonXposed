@@ -3,6 +3,7 @@ package GoonXposed.xposed.modules.LogBox
 import GoonXposed.xposed.Module
 import GoonXposed.xposed.Utils.Log
 import GoonXposed.xposed.Utils.Companion.reloadApp
+import android.app.Activity
 import android.content.Context
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XC_MethodReplacement
@@ -10,32 +11,71 @@ import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import kotlinx.coroutines.*
+import java.lang.ref.WeakReference
 
 object LogBoxModule : Module() {
     lateinit var packageParam: XC_LoadPackage.LoadPackageParam
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     var contextForMenu: Context? = null
+    private var currentActivity: WeakReference<Activity>? = null
+
+    private val shakeDetector = ShakeDetector {
+        val act = currentActivity?.get() ?: return@ShakeDetector
+        act.runOnUiThread {
+            try {
+                Log.i("Shake detected! Opening Recovery Menu...")
+                LogBoxNavigation.showRecoveryMenu(act)
+            } catch (e: Throwable) {
+                Log.e("Failed to show recovery menu on shake: ${e.message}", e)
+            }
+        }
+    }
+
+    override fun onActivity(activity: Activity) {
+        currentActivity = WeakReference(activity)
+        contextForMenu = activity
+    }
+
+    override fun onResume(activity: Activity) {
+        currentActivity = WeakReference(activity)
+        contextForMenu = activity
+        try {
+            shakeDetector.start(activity)
+            Log.i("ShakeDetector started for activity: ${activity.javaClass.simpleName}")
+        } catch (e: Throwable) {
+            Log.e("Failed to start ShakeDetector: ${e.message}", e)
+        }
+    }
+
+    override fun onPause(activity: Activity) {
+        try {
+            shakeDetector.stop()
+            Log.i("ShakeDetector stopped")
+        } catch (e: Throwable) {
+            Log.e("Failed to stop ShakeDetector: ${e.message}", e)
+        }
+    }
 
     override fun onLoad(packageParam: XC_LoadPackage.LoadPackageParam) = with(packageParam) {
         this@LogBoxModule.packageParam = packageParam
 
-        try {
+        runCatching {
             val dcdReactNativeHostClass = classLoader.loadClass("com.discord.bridge.DCDReactNativeHost")
             val getUseDeveloperSupportMethod =
-                dcdReactNativeHostClass.methods.first { it.name == "getUseDeveloperSupport" }
+                dcdReactNativeHostClass.declaredMethods.firstOrNull { it.name == "getUseDeveloperSupport" }
+                    ?: dcdReactNativeHostClass.methods.firstOrNull { it.name == "getUseDeveloperSupport" }
 
-            // NOTE: This used to call a custom `.hook { before { result = true } }` DSL that
-            // relied on a shared extensions file which broke (unresolved references).
-            // Rewritten using the standard XposedBridge/XC_MethodHook API, which is already
-            // used elsewhere in this file, to force this method to always return true.
-            XposedBridge.hookMethod(getUseDeveloperSupportMethod, object : XC_MethodHook() {
-                override fun beforeHookedMethod(param: MethodHookParam) {
-                    param.result = true
-                }
-            })
-            Log.e("Successfully hooked DCDReactNativeHost")
-        } catch (e: Exception) {
-            Log.e("Failed to hook DCDReactNativeHost: ${e.message}")
+            if (getUseDeveloperSupportMethod != null) {
+                getUseDeveloperSupportMethod.isAccessible = true
+                XposedBridge.hookMethod(getUseDeveloperSupportMethod, object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        param.result = true
+                    }
+                })
+                Log.i("Successfully hooked DCDReactNativeHost")
+            }
+        }.onFailure { e ->
+            Log.w("Could not hook DCDReactNativeHost: ${e.message}")
         }
 
         return@with
@@ -126,7 +166,7 @@ object LogBoxModule : Module() {
                                     Log.e("Failed to get context from DevSupport (non-fatal): ${e.message}")
                                 }
 
-                                val finalContext = activityContext ?: contextForMenu ?: context
+                                val finalContext = currentActivity?.get() ?: activityContext ?: contextForMenu ?: context
                                 Log.e("Using context: $finalContext (type: ${finalContext.javaClass.name})")
 
                                 LogBoxNavigation.showRecoveryMenu(finalContext)

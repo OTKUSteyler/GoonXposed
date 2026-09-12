@@ -16,6 +16,7 @@ import GoonXposed.xposed.modules.bridge.AdditionalBridgeMethodsModule
 import GoonXposed.xposed.modules.bridge.BridgeModule
 import GoonXposed.xposed.modules.no_track.BlockCrashReportingModule
 import GoonXposed.xposed.modules.no_track.BlockDeepLinksTrackingModule
+import GoonXposed.xposed.modules.LogBox.LogBoxModule
 import kotlinx.coroutines.CompletableDeferred
 
 object HookStateHolder {
@@ -61,9 +62,16 @@ class Main : Module(), IXposedHookLoadPackage, IXposedHookZygoteInit {
     }
 
     override fun handleLoadPackage(param: XC_LoadPackage.LoadPackageParam) = with(param) {
+        if (packageName != Constants.TARGET_PACKAGE) return
+        if (processName != Constants.TARGET_PACKAGE) return
         if (hooked) return
 
-        val reactActivity = classLoader.loadClass(Constants.TARGET_ACTIVITY)
+        val reactActivity = try {
+            classLoader.loadClass(Constants.TARGET_ACTIVITY)
+        } catch (e: Throwable) {
+            Log.e("Failed to load target activity ${Constants.TARGET_ACTIVITY}", e)
+            null
+        }
 
         ContextWrapper::class.java.hookMethod("attachBaseContext", Context::class.java) {
             after {
@@ -74,7 +82,7 @@ class Main : Module(), IXposedHookLoadPackage, IXposedHookZygoteInit {
             }
         }
 
-        reactActivity.hookMethod("onCreate", Bundle::class.java) {
+        reactActivity?.hookMethod("onCreate", Bundle::class.java) {
             after {
                 val act = thisObject as Activity
                 Log.i("Received Activity")
@@ -86,6 +94,20 @@ class Main : Module(), IXposedHookLoadPackage, IXposedHookZygoteInit {
 
                 this@Main.onActivity(act)
                 HookStateHolder.readyDeferred.complete(Unit)
+            }
+        }
+
+        reactActivity?.hookMethod("onResume") {
+            after {
+                val act = thisObject as Activity
+                this@Main.onResume(act)
+            }
+        }
+
+        reactActivity?.hookMethod("onPause") {
+            after {
+                val act = thisObject as Activity
+                this@Main.onPause(act)
             }
         }
 
@@ -104,5 +126,13 @@ class Main : Module(), IXposedHookLoadPackage, IXposedHookZygoteInit {
 
     override fun onActivity(activity: Activity) {
         for (module in modules) module.onActivity(activity)
+    }
+
+    override fun onResume(activity: Activity) {
+        for (module in modules) module.onResume(activity)
+    }
+
+    override fun onPause(activity: Activity) {
+        for (module in modules) module.onPause(activity)
     }
 }

@@ -57,7 +57,7 @@ object UpdaterModule : Module() {
     private const val CONFIG_FILE = "loader.json"
 
     private const val DEFAULT_BUNDLE_URL =
-        "https://github.com/OTKUSteyler/GoonCord/releases/download/latest/gooncord.js"
+        "https://github.com/OTKUSteyler/GoonCord/releases/latest/download/gooncord.js"
 
     override fun onLoad(packageParam: XC_LoadPackage.LoadPackageParam) = with(packageParam) {
         // store app data dir for later checks (LogBox settings live under files/logbox)
