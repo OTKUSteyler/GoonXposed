@@ -95,28 +95,40 @@ object FontsModule : Module() {
 
         // These files should be downloaded by the JS side, but oh well
         CoroutineScope(Dispatchers.IO).launch {
-            fontDef.main.keys.map { name ->
-                async {
-                    val url = fontDef.main.getValue(name)
-                    try {
-                        Log.i("Downloading $name from $url")
-                        val file =
-                            File(fontsDir, "$name${FILE_EXTENSIONS.first { url.endsWith(it) }}").apply { asFile() }
-                        if (file.exists()) return@async
-
-                        val client = HttpClient(CIO) {
-                            install(UserAgent) { agent = Constants.USER_AGENT }
-                        }
-
-                        val response: HttpResponse = client.get(url)
-                        if (response.status == HttpStatusCode.OK) file.writeBytes(response.body())
-
-                        return@async
-                    } catch (e: Throwable) {
-                        Log.e("Failed to download fonts ($name from $url)", e)
-                    }
+            val client = HttpClient(CIO) {
+                install(UserAgent) { agent = Constants.USER_AGENT }
+                install(HttpTimeout) {
+                    requestTimeoutMillis = 15_000
+                    connectTimeoutMillis = 10_000
+                    socketTimeoutMillis = 15_000
                 }
-            }.awaitAll()
+            }
+
+            try {
+                fontDef.main.keys.map { name ->
+                    async {
+                        val url = fontDef.main.getValue(name)
+                        try {
+                            val extension = FILE_EXTENSIONS.firstOrNull { url.substringBefore('?').endsWith(it) }
+                                ?: FILE_EXTENSIONS[0]
+                            val file = File(fontsDir, "$name$extension").apply { asFile() }
+                            if (file.exists()) return@async
+
+                            Log.i("Downloading $name from $url")
+                            val response: HttpResponse = client.get(url)
+                            if (response.status == HttpStatusCode.OK) {
+                                file.writeBytes(response.body())
+                            } else {
+                                Log.e("Failed to download fonts ($name from $url): HTTP ${response.status}")
+                            }
+                        } catch (e: Throwable) {
+                            Log.e("Failed to download fonts ($name from $url)", e)
+                        }
+                    }
+                }.awaitAll()
+            } finally {
+                client.close()
+            }
         }
     }
 
