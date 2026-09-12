@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package GoonXposed.xposed.modules.appearance
 
 import android.content.res.AssetManager
