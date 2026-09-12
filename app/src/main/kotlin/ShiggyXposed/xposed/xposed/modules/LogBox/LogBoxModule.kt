@@ -4,6 +4,7 @@ import GoonXposed.xposed.Module
 import GoonXposed.xposed.Utils.Log
 import GoonXposed.xposed.Utils.Companion.reloadApp
 import android.content.Context
+import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XC_MethodReplacement
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
@@ -23,11 +24,15 @@ object LogBoxModule : Module() {
             val getUseDeveloperSupportMethod =
                 dcdReactNativeHostClass.methods.first { it.name == "getUseDeveloperSupport" }
 
-            getUseDeveloperSupportMethod.hook {
-                before {
-                    result = true
+            // NOTE: This used to call a custom `.hook { before { result = true } }` DSL that
+            // relied on a shared extensions file which broke (unresolved references).
+            // Rewritten using the standard XposedBridge/XC_MethodHook API, which is already
+            // used elsewhere in this file, to force this method to always return true.
+            XposedBridge.hookMethod(getUseDeveloperSupportMethod, object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    param.result = true
                 }
-            }
+            })
             Log.e("Successfully hooked DCDReactNativeHost")
         } catch (e: Exception) {
             Log.e("Failed to hook DCDReactNativeHost: ${e.message}")
