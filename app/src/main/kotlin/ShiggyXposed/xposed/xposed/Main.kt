@@ -60,10 +60,15 @@ class Main : Module(), IXposedHookLoadPackage, IXposedHookZygoteInit {
     override fun initZygote(startupParam: IXposedHookZygoteInit.StartupParam) {
         for (module in modules) module.onInit(startupParam)
     }
-
     override fun handleLoadPackage(param: XC_LoadPackage.LoadPackageParam) = with(param) {
-        if (packageName != Constants.TARGET_PACKAGE) return
-        if (processName != Constants.TARGET_PACKAGE) return
+        val isTargetApp = packageName == Constants.TARGET_PACKAGE
+            || packageName.startsWith("com.discord")
+            || packageName == "dev.shiggy.cord"
+            || packageName.contains("cord")
+            || packageName.contains("discord")
+
+        if (!isTargetApp) return
+        if (processName != packageName) return
         if (hooked) return
 
         val reactActivity = try {

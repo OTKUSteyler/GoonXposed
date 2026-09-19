@@ -59,24 +59,9 @@ object LogBoxModule : Module() {
     override fun onLoad(packageParam: XC_LoadPackage.LoadPackageParam) = with(packageParam) {
         this@LogBoxModule.packageParam = packageParam
 
-        runCatching {
-            val dcdReactNativeHostClass = classLoader.loadClass("com.discord.bridge.DCDReactNativeHost")
-            val getUseDeveloperSupportMethod =
-                dcdReactNativeHostClass.declaredMethods.firstOrNull { it.name == "getUseDeveloperSupport" }
-                    ?: dcdReactNativeHostClass.methods.firstOrNull { it.name == "getUseDeveloperSupport" }
-
-            if (getUseDeveloperSupportMethod != null) {
-                getUseDeveloperSupportMethod.isAccessible = true
-                XposedBridge.hookMethod(getUseDeveloperSupportMethod, object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        param.result = true
-                    }
-                })
-                Log.i("Successfully hooked DCDReactNativeHost")
-            }
-        }.onFailure { e ->
-            Log.w("Could not hook DCDReactNativeHost: ${e.message}")
-        }
+        // Do not force getUseDeveloperSupport = true, as it causes React Native to loop
+        // attempting to connect to a Metro bundler on localhost:8081 and hang the app loading screen.
+        // Shake detector and recovery menu work independently without it.
 
         return@with
     }

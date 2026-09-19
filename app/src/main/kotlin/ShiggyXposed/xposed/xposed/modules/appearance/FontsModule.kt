@@ -61,21 +61,30 @@ object FontsModule : Module() {
     }
 
     override fun onLoad(packageParam: XC_LoadPackage.LoadPackageParam) = with(packageParam) {
-        XposedHelpers.findAndHookMethod(
-            "com.facebook.react.common.assets.ReactFontManager\$Companion",
-            classLoader,
-            "createAssetTypeface",
-            String::class.java,
-            Int::class.java,
-            "android.content.res.AssetManager",
-            object : XC_MethodReplacement() {
-                override fun replaceHookedMethod(param: MethodHookParam): Typeface? {
-                    val fontFamilyName: String = param.args[0].toString()
-                    val style: Int = param.args[1] as Int
-                    val assetManager: AssetManager = param.args[2] as AssetManager
-                    return createAssetTypeface(fontFamilyName, style, assetManager)
-                }
-            })
+        val fontManagerClass = runCatching {
+            classLoader.loadClass("com.facebook.react.common.assets.ReactFontManager\$Companion")
+        }.getOrNull() ?: runCatching {
+            classLoader.loadClass("com.facebook.react.views.text.ReactFontManager\$Companion")
+        }.getOrNull()
+
+        if (fontManagerClass != null) {
+            XposedHelpers.findAndHookMethod(
+                fontManagerClass,
+                "createAssetTypeface",
+                String::class.java,
+                Int::class.java,
+                "android.content.res.AssetManager",
+                object : XC_MethodReplacement() {
+                    override fun replaceHookedMethod(param: MethodHookParam): Typeface? {
+                        val fontFamilyName: String = param.args[0].toString()
+                        val style: Int = param.args[1] as Int
+                        val assetManager: AssetManager = param.args[2] as AssetManager
+                        return createAssetTypeface(fontFamilyName, style, assetManager)
+                    }
+                })
+        } else {
+            Log.w("FontsModule: ReactFontManager\$Companion class not found")
+        }
 
         val fontDefFile = File(appInfo.dataDir, "${Constants.FILES_DIR}/fonts.json").apply { asFile() }
         if (!fontDefFile.exists()) return@with
@@ -149,12 +158,16 @@ object FontsModule : Module() {
             // for use in the CustomFallbackBuilder below.
             for (fontFamilyName in fontFamilyNames) {
                 try {
-                    for (fileExtension in FILE_EXTENSIONS) {
-                        val (customName, refName) = fontFamilyName.split(":")
-                        val file = File(fontsDownloadsDir, "$customName/$refName.$fileExtension").apply { asFile() }
-                        val font = Font.Builder(file).build()
-                        val family = FontFamily.Builder(font).build()
-                        fontFamilies.add(family)
+                    if (fontFamilyName.contains(":")) {
+                        for (fileExtension in FILE_EXTENSIONS) {
+                            val (customName, refName) = fontFamilyName.split(":")
+                            val file = File(fontsDownloadsDir, "$customName/$refName.$fileExtension").apply { asFile() }
+                            if (file.exists()) {
+                                val font = Font.Builder(file).build()
+                                val family = FontFamily.Builder(font).build()
+                                fontFamilies.add(family)
+                            }
+                        }
                     }
                 } catch (_: Throwable) {
                 }
@@ -218,11 +231,14 @@ object FontsModule : Module() {
         val extension = EXTENSIONS[style]
 
         try {
-            for (fileExtension in FILE_EXTENSIONS) {
-                val (customName, refName) = fontFamilyName.split(":")
-                val file = File(fontsDownloadsDir, "$customName/$refName.$fileExtension").apply { asFile() }
-                if (!file.exists()) throw Exception()
-                return Typeface.createFromFile(file.absolutePath)
+            if (fontFamilyName.contains(":")) {
+                for (fileExtension in FILE_EXTENSIONS) {
+                    val (customName, refName) = fontFamilyName.split(":")
+                    val file = File(fontsDownloadsDir, "$customName/$refName.$fileExtension").apply { asFile() }
+                    if (file.exists()) {
+                        return Typeface.createFromFile(file.absolutePath)
+                    }
+                }
             }
         } catch (_: Throwable) {
         }

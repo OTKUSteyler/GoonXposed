@@ -86,18 +86,20 @@ object ThemesModule : Module() {
 
     fun hookTheme() {
         try {
-            val themeManager = param.classLoader.loadClass("com.discord.theme.utils.ColorUtilsKt")
-            val darkTheme = param.classLoader.loadClass("com.discord.theme.DarkerTheme")
-            val lightTheme = param.classLoader.loadClass("com.discord.theme.LightTheme")
+            val themeManager = runCatching { param.classLoader.loadClass("com.discord.theme.utils.ColorUtilsKt") }.getOrNull()
+            val darkTheme = runCatching { param.classLoader.loadClass("com.discord.theme.DarkTheme") }.getOrNull()
+                ?: runCatching { param.classLoader.loadClass("com.discord.theme.DarkerTheme") }.getOrNull()
+            val onyxTheme = runCatching { param.classLoader.loadClass("com.discord.theme.OnyxTheme") }.getOrNull()
+            val lightTheme = runCatching { param.classLoader.loadClass("com.discord.theme.LightTheme") }.getOrNull()
 
-            hookThemeInternal(themeManager, darkTheme, lightTheme)
+            hookThemeInternal(themeManager, darkTheme, onyxTheme, lightTheme)
         } catch (e: Throwable) {
             GoonXposed.xposed.Utils.Log.e("Failed to hook theme: ${e.message}")
         }
     }
 
     private fun hookThemeInternal(
-        themeManager: Class<*>, darkTheme: Class<*>, lightTheme: Class<*>
+        themeManager: Class<*>?, darkTheme: Class<*>?, onyxTheme: Class<*>?, lightTheme: Class<*>?
     ) {
         val theme = this.theme ?: return
 
@@ -111,26 +113,36 @@ object ThemesModule : Module() {
             // TEXT_NORMAL -> getTextNormal
             val methodName = "get${key.fromScreamingSnakeToCamelCase()}"
             value.forEachIndexed { index, v ->
+                val colorInt = hexStringToColorInt(v)
                 when (index) {
-                    0 -> hookThemeMethod(darkTheme, methodName, hexStringToColorInt(v))
-                    1 -> hookThemeMethod(lightTheme, methodName, hexStringToColorInt(v))
+                    0 -> {
+                        if (darkTheme != null) hookThemeMethod(darkTheme, methodName, colorInt)
+                        if (onyxTheme != null) hookThemeMethod(onyxTheme, methodName, colorInt)
+                    }
+                    1 -> {
+                        if (lightTheme != null) hookThemeMethod(lightTheme, methodName, colorInt)
+                    }
                 }
             }
         }
 
         // If there's any rawColors value, hook the color getter
-        if (!theme.data.rawColors.isNullOrEmpty()) {
+        if (!theme.data.rawColors.isNullOrEmpty() && themeManager != null) {
             try {
-                val getColorCompat = themeManager.getDeclaredMethod(
-                    "getColorCompat",
-                    Resources::class.java,
-                    Int::class.javaPrimitiveType,
-                    Resources.Theme::class.java,
-                )
+                val getColorCompat = runCatching {
+                    themeManager.getDeclaredMethod(
+                        "getColorCompat",
+                        Resources::class.java,
+                        Int::class.javaPrimitiveType,
+                        Resources.Theme::class.java,
+                    )
+                }.getOrNull()
 
-                val getColorCompatLegacy = themeManager.getDeclaredMethod(
-                    "getColorCompat", Context::class.java, Int::class.javaPrimitiveType
-                )
+                val getColorCompatLegacy = runCatching {
+                    themeManager.getDeclaredMethod(
+                        "getColorCompat", Context::class.java, Int::class.javaPrimitiveType
+                    )
+                }.getOrNull()
 
                 val patch = MethodHookBuilder().run {
                     before {
@@ -147,8 +159,8 @@ object ThemesModule : Module() {
                     build()
                 }
 
-                getColorCompat.hook(patch)
-                getColorCompatLegacy.hook(patch)
+                getColorCompat?.hook(patch)
+                getColorCompatLegacy?.hook(patch)
             } catch (e: Throwable) {
                 GoonXposed.xposed.Utils.Log.e("Failed to hook getColorCompat: ${e.message}")
             }
