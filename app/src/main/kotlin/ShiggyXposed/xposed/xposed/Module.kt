@@ -9,6 +9,7 @@ import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
+import GoonXposed.xposed.Utils.Log
 import kotlinx.serialization.json.JsonObjectBuilder
 import java.io.File
 import java.lang.reflect.Method
