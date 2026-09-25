@@ -13,6 +13,8 @@ import GoonXposed.xposed.Constants
 import GoonXposed.xposed.Module
 import GoonXposed.xposed.Utils.Companion.JSON
 import GoonXposed.xposed.Utils.Log
+import GoonXposed.xposed.asDir
+import GoonXposed.xposed.asFile
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*

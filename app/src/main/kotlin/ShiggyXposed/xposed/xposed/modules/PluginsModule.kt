@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.AtomicFile
 import GoonXposed.xposed.Module
 import GoonXposed.xposed.Utils.Log
+import GoonXposed.xposed.asFile
 import GoonXposed.xposed.modules.bridge.BridgeModule
 import java.io.*
 

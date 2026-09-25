@@ -2,10 +2,12 @@ package GoonXposed.xposed
 
 import android.app.Activity
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import de.robv.android.xposed.IXposedHookZygoteInit
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
+import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import kotlinx.serialization.json.JsonObjectBuilder
 import java.io.File
@@ -18,13 +20,18 @@ data class AppInfo(
     val versionCode: Long,
 )
 
-abstract class Module {
+/**
+ * Base class for every Xposed side module.
+ *
+ * The [Main] loader forwards the various [XC_LoadPackage] lifecycle callbacks to every
+ * registered [Module] instance. Modules may override any subset of the hooks below.
+ */
+open class Module {
     /**
      * Builds a JSON payload to be injected into the JavaScript context.
      */
     @Deprecated("This will be removed in future versions. Payloads can be replaced via synchronous bridge methods.")
-    open fun buildPayload(builder: JsonObjectBuilder) {
-    }
+    open fun buildPayload(builder: JsonObjectBuilder) {}
 
     /**
      * Called during Zygote initialization.
@@ -63,121 +70,151 @@ abstract class Module {
      */
     open fun onActivity(activity: Activity) {}
 
-    protected fun Context.getAppInfo(): AppInfo {
-        val pInfo = packageManager.getPackageInfo(packageName, 0)
-        val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) pInfo.longVersionCode
-        else @Suppress("DEPRECATION") pInfo.versionCode.toLong()
+    open fun onResume(activity: Activity) {}
 
-        return AppInfo(
-            packageManager.getApplicationLabel(applicationInfo).toString(),
-            packageName,
-            pInfo.versionName ?: versionCode.toString(),
-            versionCode,
-        )
-    }
+    open fun onPause(activity: Activity) {}
 
-    protected fun File.asDir() {
-        if (!this.isDirectory) this.delete()
-        this.mkdirs()
-    }
-
-    protected fun File.asFile() {
-        if (!this.isFile) this.deleteRecursively()
-    }
-
-    protected fun Class<*>.method(
-        name: String, vararg params: Class<*>?
-    ): Method = getDeclaredMethod(name, *params).apply {
-        isAccessible = true
-    }
-
-    protected fun ClassLoader.safeLoadClass(name: String): Class<*>? = runCatching { loadClass(name) }.getOrNull()
-
-    protected fun Method.hook(hook: XC_MethodHook): XC_MethodHook.Unhook = XposedBridge.hookMethod(this, hook)
-
-    protected fun Method.hook(block: MethodHookBuilder.() -> Unit): XC_MethodHook.Unhook =
-        hook(MethodHookBuilder().apply(block).build())
-
+    protected fun Context.getAppInfo(): AppInfo = (this as Context).getAppInfo()
+    protected fun File.asDir(): File = (this as File).asDir()
+    protected fun File.asFile(): File = (this as File).asFile()
+    protected fun ClassLoader.safeLoadClass(name: String): Class<*>? = (this as ClassLoader).safeLoadClass(name)
+    protected fun Class<*>.method(name: String, vararg parameterTypes: Class<*>?): Method = (this as Class<*>).method(name, *parameterTypes)
+    protected fun Method.hook(hook: XC_MethodHook): XC_MethodHook.Unhook = (this as Method).hook(hook)
+    protected fun Method.hook(block: MethodHookBuilder.() -> Unit): XC_MethodHook.Unhook = (this as Method).hook(block)
     protected fun Class<*>.hookMethod(
-        name: String, vararg params: Class<*>?, block: MethodHookBuilder.() -> Unit
-    ): XC_MethodHook.Unhook = method(name, *params).hook(MethodHookBuilder().apply(block).build())
+        name: String,
+        vararg parameterTypes: Class<*>?,
+        block: MethodHookBuilder.() -> Unit
+    ): XC_MethodHook.Unhook = (this as Class<*>).hookMethod(name, *parameterTypes, block = block)
+}
 
-    protected class MethodHookBuilder {
-        private var beforeBlock: (HookScope.() -> Unit)? = null
-        private var afterBlock: (HookScope.() -> Unit)? = null
+/**
+ * Runtime wrapper around an [XC_MethodHook.MethodHookParam] used as the receiver of every
+ * `before`/`after` hook block, exposing [thisObject], [args], [result] and [param] directly.
+ */
+class HookScope(
+    val param: XC_MethodHook.MethodHookParam,
+    private val proceed: ((XC_MethodHook.MethodHookParam) -> Unit)? = null
+) {
+    fun proceed() {
+        proceed?.invoke(param)
+    }
 
-        fun before(block: HookScope.() -> Unit) {
-            beforeBlock = block
+    val thisObject: Any?
+        get() = param.thisObject
+
+    val args: Array<Any?>
+        get() = param.args
+
+    var result: Any?
+        get() = param.result
+        set(value) {
+            param.result = value
         }
 
-        fun after(block: HookScope.() -> Unit) {
-            afterBlock = block
+    var throwable: Throwable?
+        get() = param.throwable
+        set(value) {
+            param.throwable = value
+        }
+}
+
+/**
+ * DSL builder for lazily constructed [XC_MethodHook] instances.
+ *
+ * ```kotlin
+ * val hook = MethodHookBuilder().run {
+ *     before { result = null }
+ *     after { Log.i("done") }
+ *     build()
+ * }
+ * ```
+ */
+class MethodHookBuilder {
+    private val beforeCallbacks = mutableListOf<HookScope.() -> Unit>()
+    private val afterCallbacks = mutableListOf<HookScope.() -> Unit>()
+
+    fun before(callback: HookScope.() -> Unit) {
+        beforeCallbacks += callback
+    }
+
+    fun after(callback: HookScope.() -> Unit) {
+        afterCallbacks += callback
+    }
+
+    fun build(): XC_MethodHook = object : XC_MethodHook() {
+        override fun beforeHookedMethod(param: MethodHookParam) {
+            val scope = HookScope(param = param, proceed = { p -> super.beforeHookedMethod(p) })
+            beforeCallbacks.forEach { scope.run(it) }
         }
 
-        fun build(): XC_MethodHook = object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                val b = beforeBlock
-                if (b != null) {
-                    val scope = HookScope(
-                        param = param, proceed = { p ->
-                            super.beforeHookedMethod(p)
-                        })
-                    scope.b()
-                } else {
-                    super.beforeHookedMethod(param)
-                }
-            }
-
-            override fun afterHookedMethod(param: MethodHookParam) {
-                val a = afterBlock
-                if (a != null) {
-                    val scope = HookScope(
-                        param = param, proceed = { p ->
-                            super.afterHookedMethod(p)
-                        })
-                    scope.a()
-                } else {
-                    super.afterHookedMethod(param)
-                }
-            }
+        override fun afterHookedMethod(param: MethodHookParam) {
+            val scope = HookScope(param = param, proceed = { p -> super.afterHookedMethod(p) })
+            afterCallbacks.forEach { scope.run(it) }
         }
     }
 
-    /**
-     * Scope object passed to before/after hook blocks.
-     *
-     * Provides:
-     * - Access to the [param] object
-     * - [proceed] to call the original XC_MethodHook super method
-     * - Accessors for `thisObject`, `args`, `result`, and `throwable`
-     *
-     * @property param The [XC_MethodHook.MethodHookParam] for the current hook.
-     * @property proceed Function that calls the super method.
-     */
-    protected class HookScope internal constructor(
-        val param: XC_MethodHook.MethodHookParam, private val proceed: (XC_MethodHook.MethodHookParam) -> Unit
-    ) {
-        /**
-         * Continues with the default XC_MethodHook super behavior.
-         * Equivalent to calling `super.beforeHookedMethod(param)` or
-         * `super.afterHookedMethod(param)` depending on the phase.
-         */
-        fun proceed() = proceed(param)
-
-        val thisObject: Any? get() = param.thisObject
-
-        val args: Array<Any?> get() = param.args
-
-        var result: Any?
-            get() = param.result
-            set(value) {
-                param.result = value
-            }
-
-        var throwable: Throwable?
-            get() = param.throwable
-            set(value) {
-                param.throwable = value
-            }
+    companion object {
+        fun from(block: MethodHookBuilder.() -> Unit): XC_MethodHook = MethodHookBuilder().run {
+            block()
+            build()
+        }
     }
+}
+
+fun ClassLoader.safeLoadClass(name: String): Class<*>? = try {
+    loadClass(name)
+} catch (e: Throwable) {
+    null
+}
+
+fun Class<*>.method(name: String, vararg parameterTypes: Class<*>?): Method =
+    XposedHelpers.findMethodExact(this, name, *parameterTypes)
+
+fun Method.hook(hook: XC_MethodHook): XC_MethodHook.Unhook = XposedBridge.hookMethod(this, hook)
+
+fun Method.hook(block: MethodHookBuilder.() -> Unit): XC_MethodHook.Unhook {
+    val builder = MethodHookBuilder()
+    builder.block()
+    return XposedBridge.hookMethod(this, builder.build())
+}
+
+fun Class<*>.hookMethod(
+    name: String,
+    vararg parameterTypes: Class<*>?,
+    block: MethodHookBuilder.() -> Unit
+): XC_MethodHook.Unhook {
+    val method = method(name, *parameterTypes)
+    return method.hook(block)
+}
+
+fun File.asDir(): File {
+    if (!exists() || !isDirectory) mkdirs()
+    return this
+}
+
+fun File.asFile(): File {
+    parentFile?.mkdirs()
+    return this
+}
+
+fun Context.getAppInfo(): AppInfo {
+    val label = applicationInfo.loadLabel(packageManager).toString()
+    val packageInfo = try {
+        packageManager.getPackageInfo(packageName, 0)
+    } catch (e: PackageManager.NameNotFoundException) {
+        null
+    }
+
+    val versionCode = if (packageInfo != null) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) packageInfo.longVersionCode
+        else @Suppress("DEPRECATION") packageInfo.versionCode.toLong()
+    } else 0L
+
+    return AppInfo(
+        name = label,
+        packageName = packageName,
+        version = packageInfo?.versionName ?: "",
+        versionCode = versionCode
+    )
 }

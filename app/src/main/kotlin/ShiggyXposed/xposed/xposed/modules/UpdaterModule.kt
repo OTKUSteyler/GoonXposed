@@ -56,8 +56,11 @@ object UpdaterModule : Module() {
     private const val ETAG_FILE = "etag.txt"
     private const val CONFIG_FILE = "loader.json"
 
+    val isCustomUrlEnabled: Boolean
+        get() = if (::config.isInitialized) config.customLoadUrl.enabled else false
+
     private const val DEFAULT_BUNDLE_URL =
-        "https://github.com/OTKUSteyler/GoonCord/releases/download/latest/gooncord.js"
+        "https://github.com/OTKUSteyler/GoonCord/releases/latest/download/gooncord.js"
 
     override fun onLoad(packageParam: XC_LoadPackage.LoadPackageParam) = with(packageParam) {
         // store app data dir for later checks (LogBox settings live under files/logbox)
@@ -77,7 +80,7 @@ object UpdaterModule : Module() {
         }.getOrDefault(LoaderConfig())
     }
 
-    fun downloadScript(activity: Activity? = null): Job = scope.launch {
+    fun downloadScript(activity: Activity? = null, showUpdateDialog: Boolean = true): Job = scope.launch {
         try {
             // Respect LogBox setting to disable bundle injections.
             // If the file "files/logbox/LOGBOX_SETTINGS" contains the flag bundleInjectionDisabled=true,
@@ -129,7 +132,6 @@ object UpdaterModule : Module() {
 
                         Log.i("Bundle updated (${bytes.size} bytes)")
 
-                        // This is a retry, so we show a dialog
                         if (activity != null) {
                             withContext(Dispatchers.Main) {
                                 AlertDialog.Builder(activity).setTitle("GoonCord Update Successful")
@@ -138,6 +140,22 @@ object UpdaterModule : Module() {
                                         reloadApp()
                                         dialog.dismiss()
                                     }.setCancelable(false).show()
+                            }
+                        } else if (showUpdateDialog) {
+                            val act = lastActivity?.get()
+                            act?.runOnUiThread {
+                                AlertDialog.Builder(act)
+                                    .setTitle("GoonCord Update Downloaded")
+                                    .setMessage("A reload is required for changes to take effect.")
+                                    .setPositiveButton("Reload") { dialog, _ ->
+                                        reloadApp()
+                                        dialog.dismiss()
+                                    }
+                                    .setNegativeButton("Later") { dialog, _ ->
+                                        dialog.dismiss()
+                                    }
+                                    .setCancelable(false)
+                                    .show()
                             }
                         }
                     }

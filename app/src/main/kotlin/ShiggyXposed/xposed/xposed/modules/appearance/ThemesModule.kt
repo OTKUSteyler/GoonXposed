@@ -5,9 +5,12 @@ import android.content.res.Resources
 import androidx.core.graphics.toColorInt
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import GoonXposed.xposed.Constants
+import GoonXposed.xposed.MethodHookBuilder
 import GoonXposed.xposed.Module
 import GoonXposed.xposed.Utils.Companion.JSON
-import GoonXposed.xposed.Utils.Log
+import GoonXposed.xposed.asFile
+import GoonXposed.xposed.hook
+import GoonXposed.xposed.method
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObjectBuilder
@@ -43,7 +46,7 @@ object ThemesModule : Module() {
 
     private const val THEME_FILE = "current-theme.json"
 
-
+    @Deprecated("This method is deprecated in the parent class")
     @ExperimentalSerializationApi
     override fun buildPayload(builder: JsonObjectBuilder) {
         builder.apply {
@@ -82,16 +85,23 @@ object ThemesModule : Module() {
     }
 
     fun hookTheme() {
-        val theme = this.theme ?: return
+        try {
+            val themeManager = runCatching { param.classLoader.loadClass("com.discord.theme.utils.ColorUtilsKt") }.getOrNull()
+            val darkTheme = runCatching { param.classLoader.loadClass("com.discord.theme.DarkTheme") }.getOrNull()
+                ?: runCatching { param.classLoader.loadClass("com.discord.theme.DarkerTheme") }.getOrNull()
+            val onyxTheme = runCatching { param.classLoader.loadClass("com.discord.theme.OnyxTheme") }.getOrNull()
+            val lightTheme = runCatching { param.classLoader.loadClass("com.discord.theme.LightTheme") }.getOrNull()
 
-        val themeManager = param.classLoader.safeLoadClass("com.discord.theme.utils.ColorUtilsKt")
-        val darkTheme = param.classLoader.safeLoadClass("com.discord.theme.DarkerTheme")
-        val lightTheme = param.classLoader.safeLoadClass("com.discord.theme.LightTheme")
-
-        if (themeManager == null || darkTheme == null || lightTheme == null) {
-            Log.e("Failed to load Discord theme classes, skipping theme hooks")
-            return
+            hookThemeInternal(themeManager, darkTheme, onyxTheme, lightTheme)
+        } catch (e: Throwable) {
+            GoonXposed.xposed.Utils.Log.e("Failed to hook theme: ${e.message}")
         }
+    }
+
+    private fun hookThemeInternal(
+        themeManager: Class<*>?, darkTheme: Class<*>?, onyxTheme: Class<*>?, lightTheme: Class<*>?
+    ) {
+        val theme = this.theme ?: return
 
         // Apply rawColors
         theme.data.rawColors?.forEach { (key, value) ->
@@ -103,53 +113,72 @@ object ThemesModule : Module() {
             // TEXT_NORMAL -> getTextNormal
             val methodName = "get${key.fromScreamingSnakeToCamelCase()}"
             value.forEachIndexed { index, v ->
+                val colorInt = hexStringToColorInt(v)
                 when (index) {
-                    0 -> hookThemeMethod(darkTheme, methodName, hexStringToColorInt(v))
-                    1 -> hookThemeMethod(lightTheme, methodName, hexStringToColorInt(v))
+                    0 -> {
+                        if (darkTheme != null) hookThemeMethod(darkTheme, methodName, colorInt)
+                        if (onyxTheme != null) hookThemeMethod(onyxTheme, methodName, colorInt)
+                    }
+                    1 -> {
+                        if (lightTheme != null) hookThemeMethod(lightTheme, methodName, colorInt)
+                    }
                 }
             }
         }
 
         // If there's any rawColors value, hook the color getter
-        if (!theme.data.rawColors.isNullOrEmpty()) {
-            val patch = MethodHookBuilder().run {
-                before {
-                    val arg1 = args[0]
-                    val resources = if (arg1 is Context) arg1.resources else (arg1 as Resources)
-                    val name = resources.getResourceEntryName(args[1] as Int)
-
-                    if (rawColorMap[name] != null) result = rawColorMap[name]
-                }
-
-                build()
-            }
-
-            listOf(
-                runCatching {
+        if (!theme.data.rawColors.isNullOrEmpty() && themeManager != null) {
+            try {
+                val getColorCompat = runCatching {
                     themeManager.getDeclaredMethod(
                         "getColorCompat",
                         Resources::class.java,
                         Int::class.javaPrimitiveType,
                         Resources.Theme::class.java,
                     )
-                }.getOrNull(),
-                runCatching {
+                }.getOrNull()
+
+                val getColorCompatLegacy = runCatching {
                     themeManager.getDeclaredMethod(
                         "getColorCompat", Context::class.java, Int::class.javaPrimitiveType
                     )
                 }.getOrNull()
-            ).filterNotNull().forEach { it.hook(patch) }
+
+                val patch = MethodHookBuilder().run {
+                    before {
+                        try {
+                            val arg1 = args[0]
+                            val resources = if (arg1 is Context) arg1.resources else (arg1 as Resources)
+                            val name = resources.getResourceEntryName(args[1] as Int)
+
+                            if (rawColorMap[name] != null) result = rawColorMap[name]
+                        } catch (_: Throwable) {
+                        }
+                    }
+
+                    build()
+                }
+
+                getColorCompat?.hook(patch)
+                getColorCompatLegacy?.hook(patch)
+            } catch (e: Throwable) {
+                GoonXposed.xposed.Utils.Log.e("Failed to hook getColorCompat: ${e.message}")
+            }
         }
     }
 
     // Parse HEX colour string to INT. Takes "#RRGGBBAA" or "#RRGGBB"
     private fun hexStringToColorInt(hexString: String): Int {
-        return if (hexString.length == 9) {
-            // Rearrange RRGGBBAA -> AARRGGBB so parseColor() is happy
-            val alpha = hexString.substring(7, 9)
-            val rrggbb = hexString.substring(1, 7)
-            "#$alpha$rrggbb".toColorInt()
-        } else hexString.toColorInt()
+        return try {
+            if (hexString.length == 9) {
+                // Rearrange RRGGBBAA -> AARRGGBB so parseColor() is happy
+                val alpha = hexString.substring(7, 9)
+                val rrggbb = hexString.substring(1, 7)
+                "#$alpha$rrggbb".toColorInt()
+            } else hexString.toColorInt()
+        } catch (_: Throwable) {
+            0
+        }
     }
 
     private fun hookThemeMethod(themeClass: Class<*>, methodName: String, themeValue: Int) {
