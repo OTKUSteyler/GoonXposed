@@ -50,7 +50,8 @@ class Main : Module(), IXposedHookLoadPackage, IXposedHookZygoteInit {
         PerfPatchesModule,
         FontsModule,
         ThemesModule,
-        SysColorsModule
+        SysColorsModule,
+        GmsCompatModule
     )
 
     init {
