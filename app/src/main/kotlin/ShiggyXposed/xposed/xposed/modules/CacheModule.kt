@@ -1,10 +1,10 @@
-package ShiggyXposed.xposed.modules
+package GoonXposed.xposed.modules
 
 import android.content.Context
 import android.util.AtomicFile
-import ShiggyXposed.xposed.Module
-import ShiggyXposed.xposed.Utils.Log
-import ShiggyXposed.xposed.modules.bridge.BridgeModule
+import GoonXposed.xposed.Module
+import GoonXposed.xposed.Utils.Log
+import GoonXposed.xposed.modules.bridge.BridgeModule
 import java.io.*
 
 /**
@@ -35,7 +35,7 @@ import java.io.*
  */
 object CacheModule : Module() {
 
-    private const val CACHE_DIR = "Shiggy"
+    private const val CACHE_DIR = "Goon"
 
     private const val MODULES_CACHE_PREFIX = "modules"
     private const val ASSETS_CACHE_PREFIX = "assets"
