@@ -16,7 +16,13 @@ object FixResourcesModule : Module() {
                 "getIdentifier", String::class.java, String::class.java, String::class.java
             ) {
                 before {
-                    if (args[2] == TARGET_PACKAGE) args[2] = packageName
+                    if (args[2] == packageName) {
+                        args[2] = TARGET_PACKAGE
+                    }
+                    val name = args[0] as? String
+                    if (name != null && name.startsWith("$packageName:")) {
+                        args[0] = name.replaceFirst("$packageName:", "$TARGET_PACKAGE:")
+                    }
                 }
             }
         }

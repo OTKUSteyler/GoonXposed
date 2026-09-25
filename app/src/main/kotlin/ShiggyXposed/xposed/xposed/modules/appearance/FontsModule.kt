@@ -76,7 +76,7 @@ object FontsModule : Module() {
                     classLoader,
                     "createAssetTypeface",
                     String::class.java,
-                    Int::class.java,
+                    Int::class.javaPrimitiveType ?: java.lang.Integer.TYPE,
                     "android.content.res.AssetManager",
                     replacement
                 )

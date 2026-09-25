@@ -59,33 +59,35 @@ object HookScriptLoaderModule : Module() {
         ).mapNotNull { classLoader.safeLoadClass(it) }.forEach { hook(it) }
     }
 
-    private fun hook(instance: Class<*>) = runCatching {
-        val loadScriptFromAssets = instance.method(
-            "loadScriptFromAssets", AssetManager::class.java, String::class.java, Boolean::class.javaPrimitiveType
-        )
+    private fun hook(instance: Class<*>) {
+        val loadScriptFromAssets = runCatching {
+            instance.method(
+                "loadScriptFromAssets", AssetManager::class.java, String::class.java, Boolean::class.javaPrimitiveType
+            )
+        }.getOrNull()
 
-        val loadScriptFromFile = instance.method(
-            "loadScriptFromFile", String::class.java, String::class.java, Boolean::class.javaPrimitiveType
-        )
+        val loadScriptFromFile = runCatching {
+            instance.method(
+                "loadScriptFromFile", String::class.java, String::class.java, Boolean::class.javaPrimitiveType
+            )
+        }.getOrNull()
 
-        loadScriptFromAssets.hook {
+        loadScriptFromAssets?.hook {
             before {
                 Log.i("Received call to loadScriptFromAssets: ${args[1]} (sync: ${args[2]})")
                 runCustomScripts(loadScriptFromFile, loadScriptFromAssets)
             }
         }
 
-        loadScriptFromFile.hook {
+        loadScriptFromFile?.hook {
             before {
                 Log.i("Received call to loadScriptFromFile: ${args[0]} (sync: ${args[2]})")
                 runCustomScripts(loadScriptFromFile, loadScriptFromAssets)
             }
         }
-    }.onFailure {
-        Log.e("Failed to hook script loading methods in ${instance.name}:", it)
     }
 
-    private fun HookScope.runCustomScripts(loadScriptFromFile: Method, loadScriptFromAssets: Method) {
+    private fun HookScope.runCustomScripts(loadScriptFromFile: Method?, loadScriptFromAssets: Method?) {
         Log.i("Running custom scripts...")
 
         runBlocking {
@@ -111,9 +113,11 @@ object HookScriptLoaderModule : Module() {
         val runScriptFile = { file: File ->
             Log.i("Loading script: ${file.absolutePath}")
 
-            XposedBridge.invokeOriginalMethod(
-                loadScriptFromFile, thisObject, arrayOf(file.absolutePath, file.absolutePath, loadSynchronously)
-            )
+            if (loadScriptFromFile != null) {
+                XposedBridge.invokeOriginalMethod(
+                    loadScriptFromFile, thisObject, arrayOf(file.absolutePath, file.absolutePath, loadSynchronously)
+                )
+            }
 
             Unit
         }
@@ -141,7 +145,7 @@ object HookScriptLoaderModule : Module() {
                         resources.assets.open("Shiggy.bundle").use { hasFallback = true }
                     } catch (_: Throwable) {}
 
-                    if (hasFallback) {
+                    if (hasFallback && loadScriptFromAssets != null) {
                         Log.i("Loading fallback assets://Shiggy.bundle")
                         XposedBridge.invokeOriginalMethod(
                             loadScriptFromAssets,
