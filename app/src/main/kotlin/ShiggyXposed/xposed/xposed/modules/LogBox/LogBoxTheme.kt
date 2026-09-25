@@ -1,10 +1,10 @@
-package ShiggyXposed.xposed.modules.LogBox
+package GoonXposed.xposed.modules.LogBox
 
 import android.content.Context
 import android.graphics.Color
 import org.json.JSONObject
 import java.io.File
-import ShiggyXposed.xposed.Utils.Log
+import GoonXposed.xposed.Utils.Log
 
 object LogBoxTheme {
 

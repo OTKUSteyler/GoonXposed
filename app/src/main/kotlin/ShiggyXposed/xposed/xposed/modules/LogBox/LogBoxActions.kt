@@ -1,12 +1,12 @@
-package ShiggyXposed.xposed.modules.LogBox
+package GoonXposed.xposed.modules.LogBox
 
 import android.content.Context
 import android.widget.Toast
 import org.json.JSONObject
 import java.io.File
-import ShiggyXposed.xposed.Utils.Log
-import ShiggyXposed.xposed.Utils.Companion.reloadApp
-import ShiggyXposed.xposed.Constants
+import GoonXposed.xposed.Utils.Log
+import GoonXposed.xposed.Utils.Companion.reloadApp
+import GoonXposed.xposed.Constants
 import kotlinx.coroutines.*
 
 object LogBoxActions {

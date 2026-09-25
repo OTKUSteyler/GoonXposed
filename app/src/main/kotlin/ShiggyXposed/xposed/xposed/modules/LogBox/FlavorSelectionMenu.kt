@@ -1,4 +1,4 @@
-package ShiggyXposed.xposed.modules.LogBox
+package GoonXposed.xposed.modules.LogBox
 
 import android.app.AlertDialog
 import android.content.Context

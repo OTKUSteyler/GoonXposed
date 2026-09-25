@@ -1,13 +1,17 @@
-package ShiggyXposed.xposed.modules.LogBox
+package GoonXposed.xposed.modules.LogBox
 
-import ShiggyXposed.xposed.Module
-import ShiggyXposed.xposed.Utils.Log
+import GoonXposed.xposed.Constants
+import GoonXposed.xposed.Module
+import GoonXposed.xposed.Utils.Log
+import GoonXposed.xposed.hook
 import android.content.Context
+import de.robv.android.xposed.XC_MethodHook.MethodHookParam
 import de.robv.android.xposed.XC_MethodReplacement
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import kotlinx.coroutines.*
+import java.io.File
 
 object LogBoxModule : Module() {
     lateinit var packageParam: XC_LoadPackage.LoadPackageParam
@@ -24,7 +28,12 @@ object LogBoxModule : Module() {
 
             getUseDeveloperSupportMethod.hook {
                 before {
-                    result = true
+                    // Only enable dev support when the injected bundle is already present. A fresh
+                    // install (no bundle yet) must load Discord's own bundle; otherwise React Native
+                    // waits for a Metro packager and Discord never opens.
+                    result = File(
+                        appInfo.dataDir, "${Constants.CACHE_DIR}/${Constants.MAIN_SCRIPT_FILE}"
+                    ).exists()
                 }
             }
             Log.e("Successfully hooked DCDReactNativeHost")
@@ -89,21 +98,6 @@ object LogBoxModule : Module() {
         }
 
         try {
-            try {
-                val handleReloadJSMethod = clazz.methods.firstOrNull { it.name == "handleReloadJS" }
-                if (handleReloadJSMethod != null) {
-                    XposedBridge.hookMethod(handleReloadJSMethod, object : XC_MethodReplacement() {
-                        override fun replaceHookedMethod(param: MethodHookParam): Any? {
-                            Log.e("handleReloadJS called - reloading app")
-                            ShiggyXposed.xposed.Utils.Companion.reloadApp()
-                            return null
-                        }
-                    })
-                }
-            } catch (e: Exception) {
-                Log.e("Failed to hook handleReloadJS: ${e.message}")
-            }
-
             try {
                 val showDevOptionsDialogMethod = clazz.methods.firstOrNull { it.name == "showDevOptionsDialog" }
                 if (showDevOptionsDialogMethod != null) {

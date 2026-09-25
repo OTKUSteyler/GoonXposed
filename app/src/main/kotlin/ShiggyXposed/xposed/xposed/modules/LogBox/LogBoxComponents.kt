@@ -1,4 +1,4 @@
-package ShiggyXposed.xposed.modules.LogBox
+package GoonXposed.xposed.modules.LogBox
 
 import android.content.Context
 import android.content.res.ColorStateList

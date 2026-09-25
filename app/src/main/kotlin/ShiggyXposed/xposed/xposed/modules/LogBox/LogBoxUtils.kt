@@ -1,4 +1,4 @@
-package ShiggyXposed.xposed.modules.LogBox
+package GoonXposed.xposed.modules.LogBox
 
 import android.content.Context
 import android.util.TypedValue
@@ -9,8 +9,8 @@ import android.view.View
 import android.widget.Toast
 import org.json.JSONObject
 import java.io.File
-import ShiggyXposed.xposed.Constants
-import ShiggyXposed.xposed.Utils.Log
+import GoonXposed.xposed.Constants
+import GoonXposed.xposed.Utils.Log
 
 object LogBoxUtils {
 
