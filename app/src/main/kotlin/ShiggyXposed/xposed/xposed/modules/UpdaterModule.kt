@@ -1,18 +1,18 @@
-package ShiggyXposed.xposed.modules
+package GoonXposed.xposed.modules
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
 import android.util.AtomicFile
 import android.widget.Toast
+import androidx.core.util.writeBytes
 import de.robv.android.xposed.callbacks.XC_LoadPackage
-import dev.rushii.libunbound.LibUnbound
-import ShiggyXposed.xposed.Constants
-import ShiggyXposed.xposed.Module
-import ShiggyXposed.xposed.Utils
-import ShiggyXposed.xposed.Utils.Companion.JSON
-
-import ShiggyXposed.xposed.Utils.Log
-import ShiggyXposed.xposed.modules.bridge.BridgeModule
+import GoonXposed.xposed.Constants
+import GoonXposed.xposed.Module
+import GoonXposed.xposed.Utils
+import GoonXposed.xposed.Utils.Companion.JSON
+import GoonXposed.xposed.Utils.Companion.reloadApp
+import GoonXposed.xposed.Utils.Log
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -22,41 +22,46 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.encodeToString
 import java.io.File
 import java.lang.ref.WeakReference
 
 @Serializable
-data class CustomLoadUrl(val enabled: Boolean = false, val url: String = "")
+data class CustomLoadUrl(
+    val enabled: Boolean = false, val url: String = ""
+)
 
 @Serializable
-data class LoaderConfig(val customLoadUrl: CustomLoadUrl = CustomLoadUrl(), val disableInjection: Boolean = false)
+data class LoaderConfig(
+    val customLoadUrl: CustomLoadUrl = CustomLoadUrl()
+)
 
-@Serializable
-data class EndpointInfo(val paths: ArrayList<String>, val hash: String? = null, val version: String)
-
+/**
+ * Module that updates the JS bundle by downloading it from a remote URL.
+ *
+ * Shows dialogs when failed allowing retry.
+ */
 object UpdaterModule : Module() {
     private lateinit var config: LoaderConfig
-    val isCustomUrlEnabled: Boolean
-        get() = config.customLoadUrl.enabled
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var lastActivity: WeakReference<Activity>? = null
 
     private lateinit var cacheDir: File
     private lateinit var bundle: File
     private lateinit var etag: File
+    // Path to the application's data directory so we can read LogBox settings
+    private lateinit var appDataDir: File
 
-    private const val TIMEOUT_STRICT = 15000L
-    private const val MIN_BYTECODE_SIZE = 512
+    private const val TIMEOUT_CACHED = 5000L
+    private const val TIMEOUT = 10000L
     private const val ETAG_FILE = "etag.txt"
     private const val CONFIG_FILE = "loader.json"
 
-    private const val DEFAULT_BASE_URL = "https://github.com/kmmiio99o/ShiggyCord/releases/latest/download/"
-    private const val FALLBACK_BASE_URL = "https://bundle.shiggycord.dev/"
-    private const val DEFAULT_BUNDLE_NAME = "shiggycord.min.js"
+    private const val DEFAULT_BUNDLE_URL =
+        "https://github.com/OTKUSteyler/GoonCord/releases/download/latest/gooncord.js"
 
     override fun onLoad(packageParam: XC_LoadPackage.LoadPackageParam) = with(packageParam) {
+        // store app data dir for later checks (LogBox settings live under files/logbox)
+        appDataDir = File(appInfo.dataDir)
         cacheDir = File(appInfo.dataDir, Constants.CACHE_DIR).apply { mkdirs() }
         val filesDir = File(appInfo.dataDir, Constants.FILES_DIR).apply { mkdirs() }
 
@@ -64,36 +69,52 @@ object UpdaterModule : Module() {
         etag = File(cacheDir, ETAG_FILE)
 
         val configFile = File(filesDir, CONFIG_FILE)
-        config = runCatching {
-            if (configFile.exists()) JSON.decodeFromString<LoaderConfig>(configFile.readText()) else LoaderConfig()
-        }.getOrDefault(LoaderConfig())
 
-        BridgeModule.registerMethod("revenge.updater.clear") {
-            if (bundle.exists()) bundle.delete()
-            if (etag.exists()) etag.delete()
-            null
-        }
+        config = runCatching {
+            if (configFile.exists()) {
+                JSON.decodeFromString<LoaderConfig>(configFile.readText())
+            } else LoaderConfig()
+        }.getOrDefault(LoaderConfig())
     }
 
-    fun downloadScript(activity: Activity? = null, showUpdateDialog: Boolean = true): Job = scope.launch {
+    fun downloadScript(activity: Activity? = null): Job = scope.launch {
         try {
+            // Respect LogBox setting to disable bundle injections.
+            // If the file "files/logbox/LOGBOX_SETTINGS" contains the flag bundleInjectionDisabled=true,
+            // skip attempting to download/update the bundle.
+            try {
+                val settingsFile = File(appDataDir, "files/logbox/LOGBOX_SETTINGS")
+                if (settingsFile.exists()) {
+                    val txt = settingsFile.readText()
+                    // look for a simple true marker; this avoids introducing a new JSON dependency here
+                    if (txt.contains("\"bundleInjectionDisabled\"") && txt.contains("true")) {
+                        Log.i("UpdaterModule: bundle injection disabled by LogBox settings — skipping download")
+                        return@launch
+                    }
+                }
+            } catch (ignore: Exception) {
+                // If anything goes wrong reading the setting, proceed with normal behaviour.
+            }
+
             HttpClient(CIO) {
                 expectSuccess = false
-                install(HttpTimeout) {
-                    requestTimeoutMillis = TIMEOUT_STRICT
-                    connectTimeoutMillis = 5000L
-                    socketTimeoutMillis = TIMEOUT_STRICT
-                }
                 install(UserAgent) { agent = Constants.USER_AGENT }
-                install(HttpRedirect) { checkHttpMethod = false }
+                install(HttpRedirect) {}
             }.use { client ->
-                val targetUrl = resolveTargetUrl(client)
-                Log.i("Fetching bundle: $targetUrl")
+                val url = config.customLoadUrl.takeIf { it.enabled }?.url ?: DEFAULT_BUNDLE_URL
+                Log.i("Fetching JS bundle from: $url")
 
-                val response: HttpResponse = client.get(targetUrl) {
+                val response: HttpResponse = client.get(url) {
                     headers {
                         if (etag.exists() && bundle.exists()) {
                             append(HttpHeaders.IfNoneMatch, etag.readText())
+                        }
+                    }
+
+                    // Retries don't need timeout
+                    if (activity == null) {
+                        timeout {
+                            requestTimeoutMillis = if (!bundle.exists()) TIMEOUT else TIMEOUT_CACHED
                         }
                     }
                 }
@@ -101,63 +122,38 @@ object UpdaterModule : Module() {
                 when (response.status) {
                     HttpStatusCode.OK -> {
                         val bytes: ByteArray = response.body()
+                        AtomicFile(bundle).writeBytes(bytes)
 
-                        if (bytes.size < MIN_BYTECODE_SIZE) {
-                            throw Exception("Payload too small (${bytes.size} bytes). Possible corrupt build.")
-                        }
+                        val newTag = response.headers[HttpHeaders.ETag]
+                        if (!newTag.isNullOrEmpty()) etag.writeText(newTag) else etag.delete()
 
-                        AtomicFile(bundle).apply {
-                            val stream = startWrite()
-                            try {
-                                stream.write(bytes)
-                                finishWrite(stream)
-                            } catch (e: Exception) {
-                                failWrite(stream)
-                                throw e
+                        Log.i("Bundle updated (${bytes.size} bytes)")
+
+                        // This is a retry, so we show a dialog
+                        if (activity != null) {
+                            withContext(Dispatchers.Main) {
+                                AlertDialog.Builder(activity).setTitle("GoonCord Update Successful")
+                                    .setMessage("A reload is required for changes to take effect.")
+                                    .setPositiveButton("Reload") { dialog, _ ->
+                                        reloadApp()
+                                        dialog.dismiss()
+                                    }.setCancelable(false).show()
                             }
                         }
-
-                        response.headers[HttpHeaders.ETag]?.let { etag.writeText(it) } ?: etag.delete()
-                        Log.i("Bundle updated: ${bytes.size} bytes")
                     }
 
-                    HttpStatusCode.NotModified -> Log.i("Bundle is up to date (304)")
-                    else -> throw ResponseException(response, "HTTP ${response.status}")
+                    HttpStatusCode.NotModified -> {
+                        Log.i("Server responded with 304, no changes")
+                    }
+
+                    else -> {
+                        throw ResponseException(response, "Received status: ${response.status}")
+                    }
                 }
             }
         } catch (e: Throwable) {
-            Log.e("Updater Error", e)
-        }
-    }
-
-    private suspend fun resolveTargetUrl(client: HttpClient): String {
-        if (config.customLoadUrl.enabled && config.customLoadUrl.url.isNotEmpty()) {
-            return config.customLoadUrl.url
-        }
-
-        return tryResolveUrl(client, DEFAULT_BASE_URL)
-            ?: tryResolveUrl(client, FALLBACK_BASE_URL)
-            ?: DEFAULT_BASE_URL + DEFAULT_BUNDLE_NAME
-    }
-
-    private suspend fun tryResolveUrl(client: HttpClient, baseUrl: String): String? {
-        return try {
-            val infoResponse = client.get("${baseUrl}info.json")
-            if (infoResponse.status == HttpStatusCode.OK) {
-                val info = JSON.decodeFromString<EndpointInfo>(infoResponse.bodyAsText())
-                val hermesVersion = withTimeoutOrNull(2000L) {
-                    runCatching { LibUnbound.getHermesRuntimeBytecodeVersion() }.getOrNull()
-                } ?: 96
-
-                val hbcName = "shiggycord.$hermesVersion.hbc"
-                when {
-                    info.paths.contains(hbcName) -> baseUrl + hbcName
-                    info.paths.contains("shiggycord.min.js") -> baseUrl + "shiggycord.min.js"
-                    else -> baseUrl + DEFAULT_BUNDLE_NAME
-                }
-            } else null
-        } catch (e: Exception) {
-            null
+            Log.e("Failed to download script", e)
+            showErrorDialog(e)
         }
     }
 
@@ -165,16 +161,16 @@ object UpdaterModule : Module() {
         lastActivity = WeakReference(activity)
     }
 
-    fun setDisableInjection(context: Context, disabled: Boolean) {
-        val filesDir = File(context.dataDir, Constants.FILES_DIR).apply { mkdirs() }
-        val configFile = File(filesDir, CONFIG_FILE)
-        val newCfg = config.copy(disableInjection = disabled)
-        configFile.writeText(JSON.encodeToString(newCfg))
-        config = newCfg
-        Toast.makeText(context, "Injection ${if (disabled) "disabled" else "enabled"}", Toast.LENGTH_SHORT).show()
+    fun showErrorDialog(e: Throwable) {
+        val activity = lastActivity?.get() ?: return
+
+        activity.runOnUiThread {
+        }
     }
 
-    fun isInjectionDisabled(context: Context? = null): Boolean {
-        return if (::config.isInitialized) config.disableInjection else false
+    fun resetLoaderConfig(context: Context) {
+        val filesDir = File(context.dataDir, Constants.FILES_DIR)
+        val config = File(filesDir, CONFIG_FILE)
+        if (config.exists()) config.delete()
     }
 }
