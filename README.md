@@ -57,7 +57,7 @@ Before installing and using GoonXposed:
 ## Installation
 
 1. Download the latest APK from the repository Releases:
-   - https://github.com/kmmiio99o/ShiggyXposed/releases
+   - https://github.com/OTKUSteyler/GoonXposed/releases
 2. Install the APK on your device (standard package install).
 3. Open your LSPosed manager (or chosen Xposed manager).
 4. Enable the GoonXposed module and ensure the module's scope includes the Discord app.
