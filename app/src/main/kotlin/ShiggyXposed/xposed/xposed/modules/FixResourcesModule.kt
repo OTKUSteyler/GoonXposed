@@ -16,7 +16,7 @@ object FixResourcesModule : Module() {
                 "getIdentifier", String::class.java, String::class.java, String::class.java
             ) {
                 before {
-                    if (args[2] == packageName) args[2] = TARGET_PACKAGE
+                    if (args[2] == TARGET_PACKAGE) args[2] = packageName
                 }
             }
         }

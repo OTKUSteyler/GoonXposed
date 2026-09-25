@@ -71,14 +71,16 @@ class Main : Module(), IXposedHookLoadPackage, IXposedHookZygoteInit {
 
     override fun handleLoadPackage(param: XC_LoadPackage.LoadPackageParam) = with(param) {
         if (!isTargetPackage(packageName)) return
-        if (processName != packageName) return
+        if (processName.contains(":")) return
         if (hooked) return
 
         val activityClassNames = listOf(
             Constants.TARGET_ACTIVITY,
             "$packageName.react_activities.ReactActivity",
             "com.discord.react_activities.ReactActivity",
-            "com.facebook.react.ReactActivity"
+            "com.facebook.react.ReactActivity",
+            "com.discord.main.MainActivity",
+            "com.discord.main.MainDefault"
         )
         var reactActivity: Class<*>? = null
         for (className in activityClassNames) {
@@ -107,7 +109,8 @@ class Main : Module(), IXposedHookLoadPackage, IXposedHookZygoteInit {
                 val act = thisObject as Activity
                 if (reactActivity == null &&
                     !act.javaClass.name.contains("ReactActivity", ignoreCase = true) &&
-                    !act.javaClass.name.contains("MainActivity", ignoreCase = true)
+                    !act.javaClass.name.contains("MainActivity", ignoreCase = true) &&
+                    !act.javaClass.name.contains("MainDefault", ignoreCase = true)
                 ) {
                     return@after
                 }

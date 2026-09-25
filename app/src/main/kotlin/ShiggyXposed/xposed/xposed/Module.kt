@@ -73,19 +73,6 @@ open class Module {
     open fun onResume(activity: Activity) {}
 
     open fun onPause(activity: Activity) {}
-
-    protected fun Context.getAppInfo(): AppInfo = (this as Context).getAppInfo()
-    protected fun File.asDir(): File = (this as File).asDir()
-    protected fun File.asFile(): File = (this as File).asFile()
-    protected fun ClassLoader.safeLoadClass(name: String): Class<*>? = (this as ClassLoader).safeLoadClass(name)
-    protected fun Class<*>.method(name: String, vararg parameterTypes: Class<*>?): Method = (this as Class<*>).method(name, *parameterTypes)
-    protected fun Method.hook(hook: XC_MethodHook): XC_MethodHook.Unhook = (this as Method).hook(hook)
-    protected fun Method.hook(block: MethodHookBuilder.() -> Unit): XC_MethodHook.Unhook = (this as Method).hook(block)
-    protected fun Class<*>.hookMethod(
-        name: String,
-        vararg parameterTypes: Class<*>?,
-        block: MethodHookBuilder.() -> Unit
-    ): XC_MethodHook.Unhook = (this as Class<*>).hookMethod(name, *parameterTypes, block = block)
 }
 
 /**
@@ -183,10 +170,12 @@ fun Class<*>.hookMethod(
     name: String,
     vararg parameterTypes: Class<*>?,
     block: MethodHookBuilder.() -> Unit
-): XC_MethodHook.Unhook {
+): XC_MethodHook.Unhook? = runCatching {
     val method = method(name, *parameterTypes)
-    return method.hook(block)
-}
+    method.hook(block)
+}.onFailure {
+    Log.w("Failed to hook method $name on ${this.name}: ${it.message}")
+}.getOrNull()
 
 fun File.asDir(): File {
     if (!exists() || !isDirectory) mkdirs()

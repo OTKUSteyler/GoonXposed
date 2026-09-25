@@ -1,6 +1,13 @@
 name: Build APK
 
-on: [push]
+on:
+  push:
+    branches: [ "master" ]
+    tags: [ "v*", "V*" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -65,3 +72,23 @@ jobs:
         with:
           name: app-release
           path: /tmp/ShiggyXposedbuild/apks/app-release.apk
+
+      - name: Publish APKs to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
+          else
+            TAG_NAME=$(gh release view --json tagName -q .tagName 2>/dev/null || echo "")
+          fi
+          if [ -n "$TAG_NAME" ]; then
+            echo "Uploading APKs to release $TAG_NAME..."
+            gh release upload "$TAG_NAME" \
+              /tmp/ShiggyXposedbuild/apks/app-release.apk \
+              /tmp/ShiggyXposedbuild/apks/app-debug.apk \
+              --clobber
+          else
+            echo "No release tag found to upload assets to."
+          fi
