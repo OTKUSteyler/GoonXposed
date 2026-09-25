@@ -5,23 +5,26 @@ plugins {
 }
 
 android {
-    namespace = "ShiggyXposed.xposed"
+    namespace = "GoonXposed.xposed"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "ShiggyXposed.xposed"
+        applicationId = "GoonXposed.xposed"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1360
-        versionName = "1.3.6"
+        versionCode = 1358
+        versionName = "1.3.8"
     }
 
     signingConfigs {
         create("release") {
-            storeFile = file("../release.keystore")
-            storePassword = "shiggyxposed"
-            keyAlias = "shiggyxposed"
-            keyPassword = "shiggyxposed"
+            val keystoreFile = file("../release.keystore")
+            if (keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = "goonxposed"
+                keyAlias = "goonxposed"
+                keyPassword = "goonxposed"
+            }
         }
     }
 
@@ -34,7 +37,10 @@ android {
         release {
             isDebuggable = false
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            val keystoreFile = file("../release.keystore")
+            if (keystoreFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {
