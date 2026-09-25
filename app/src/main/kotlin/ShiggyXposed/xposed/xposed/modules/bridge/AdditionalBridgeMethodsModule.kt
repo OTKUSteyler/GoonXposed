@@ -1,4 +1,4 @@
-package ShiggyXposed.xposed.modules.bridge
+package GoonXposed.xposed.modules.bridge
 
 import android.app.Activity
 import android.app.AlertDialog
@@ -7,9 +7,9 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
 import android.widget.Toast
-import ShiggyXposed.xposed.Module
-import ShiggyXposed.xposed.Utils
-import ShiggyXposed.xposed.Utils.Companion.reloadApp
+import GoonXposed.xposed.Module
+import GoonXposed.xposed.Utils
+import GoonXposed.xposed.getAppInfo
 import java.io.File
 
 object AdditionalBridgeMethodsModule : Module() {
@@ -48,11 +48,6 @@ object AdditionalBridgeMethodsModule : Module() {
 
             file.writeText(contents as String)
         }
-
-        BridgeModule.registerMethod("Shiggy.app.reload") {
-            reloadApp()
-            null
-        }
     }
 
     override fun onActivity(activity: Activity) = with(activity) {
@@ -65,10 +60,10 @@ object AdditionalBridgeMethodsModule : Module() {
             val clip = ClipData.newPlainText("Stack Trace", errorString)
 
             AlertDialog.Builder(this)
-                .setTitle("ShiggyCord Error")
+                .setTitle("GoonCord Error")
                 .setMessage(
                     """
-                    ShiggyCord: $version
+                    GoonCord: $version
                     ${app.name}: ${app.version} (${app.versionCode})
                     Device: ${Build.MANUFACTURER} ${Build.MODEL}
 
