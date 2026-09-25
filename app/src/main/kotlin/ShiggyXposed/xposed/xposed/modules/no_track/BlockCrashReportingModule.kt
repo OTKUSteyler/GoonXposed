@@ -1,9 +1,11 @@
-package ShiggyXposed.xposed.modules.no_track
+package GoonXposed.xposed.modules.no_track
 
 import android.content.Context
 import de.robv.android.xposed.callbacks.XC_LoadPackage
-import ShiggyXposed.xposed.Module
-import ShiggyXposed.xposed.Utils.Log
+import GoonXposed.xposed.Module
+import GoonXposed.xposed.Utils.Log
+import GoonXposed.xposed.hookMethod
+import GoonXposed.xposed.safeLoadClass
 
 /**
  * Hooks Discord's crash reporting to disable Sentry initialization.
