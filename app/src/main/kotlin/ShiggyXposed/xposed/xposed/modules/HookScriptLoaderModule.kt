@@ -19,6 +19,7 @@ import GoonXposed.xposed.modules.HookScriptLoaderModule.PRELOADS_DIR
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import java.io.File
 import java.lang.reflect.Method
 
@@ -88,19 +89,21 @@ object HookScriptLoaderModule : Module() {
         Log.i("Running custom scripts...")
 
         runBlocking {
-            val ready = async { HookStateHolder.readyDeferred.join() }
             val isCustomUrl = UpdaterModule.isCustomUrlEnabled
 
             if (!mainScript.exists() || isCustomUrl) {
                 val reason = if (isCustomUrl) "Custom URL enabled" else "Main script does not exist"
                 Log.i("$reason, downloading before load...")
-                val download =
-                    async { UpdaterModule.downloadScript(showUpdateDialog = false).join() }
-                awaitAll(ready, download)
+                try {
+                    withTimeout(10000L) {
+                        UpdaterModule.downloadScript(showUpdateDialog = false).join()
+                    }
+                } catch (e: Throwable) {
+                    Log.w("Bundle download did not complete in time", e)
+                }
             } else {
                 Log.i("Main script exists, updating in background...")
                 UpdaterModule.downloadScript(showUpdateDialog = true)
-                ready.await()
             }
         }
 
@@ -129,15 +132,25 @@ object HookScriptLoaderModule : Module() {
                 if (mainScript.exists()) {
                     runScriptFile(mainScript)
                 } else {
-                    Log.i("Main script does not exist, falling back")
+                    Log.i("Main script does not exist, checking for fallback asset")
 
                     if (!::resources.isInitialized) resources = XModuleResources.createInstance(modulePath, null)
 
-                    XposedBridge.invokeOriginalMethod(
-                        loadScriptFromAssets,
-                        thisObject,
-                        arrayOf(resources.assets, "assets://Shiggy.bundle", loadSynchronously)
-                    )
+                    var hasFallback = false
+                    try {
+                        resources.assets.open("Shiggy.bundle").use { hasFallback = true }
+                    } catch (_: Throwable) {}
+
+                    if (hasFallback) {
+                        Log.i("Loading fallback assets://Shiggy.bundle")
+                        XposedBridge.invokeOriginalMethod(
+                            loadScriptFromAssets,
+                            thisObject,
+                            arrayOf(resources.assets, "assets://Shiggy.bundle", loadSynchronously)
+                        )
+                    } else {
+                        Log.w("No fallback bundle asset found; letting host app load default JS")
+                    }
                 }
             }
         } catch (e: Throwable) {

@@ -61,10 +61,36 @@ class Main : Module(), IXposedHookLoadPackage, IXposedHookZygoteInit {
         dispatch("onInit") { module -> module.onInit(startupParam) }
     }
 
+    private fun isTargetPackage(pkg: String): Boolean {
+        return pkg == Constants.TARGET_PACKAGE
+                || pkg.startsWith("com.discord")
+                || pkg == "dev.shiggy.cord"
+                || pkg.contains("discord")
+                || pkg.contains("gooncord")
+    }
+
     override fun handleLoadPackage(param: XC_LoadPackage.LoadPackageParam) = with(param) {
+        if (!isTargetPackage(packageName)) return
+        if (processName != packageName) return
         if (hooked) return
 
-        val reactActivity = classLoader.loadClass(Constants.TARGET_ACTIVITY)
+        val activityClassNames = listOf(
+            Constants.TARGET_ACTIVITY,
+            "$packageName.react_activities.ReactActivity",
+            "com.discord.react_activities.ReactActivity",
+            "com.facebook.react.ReactActivity"
+        )
+        var reactActivity: Class<*>? = null
+        for (className in activityClassNames) {
+            try {
+                reactActivity = classLoader.loadClass(className)
+                if (reactActivity != null) break
+            } catch (_: Throwable) {}
+        }
+
+        if (reactActivity == null) {
+            Log.w("Target activity not found by name, falling back to Activity base class")
+        }
 
         ContextWrapper::class.java.hookMethod("attachBaseContext", Context::class.java) {
             after {
@@ -75,10 +101,17 @@ class Main : Module(), IXposedHookLoadPackage, IXposedHookZygoteInit {
             }
         }
 
-        reactActivity.hookMethod("onCreate", Bundle::class.java) {
+        val targetActivityClass = reactActivity ?: Activity::class.java
+        targetActivityClass.hookMethod("onCreate", Bundle::class.java) {
             after {
                 val act = thisObject as Activity
-                Log.i("Received Activity")
+                if (reactActivity == null &&
+                    !act.javaClass.name.contains("ReactActivity", ignoreCase = true) &&
+                    !act.javaClass.name.contains("MainActivity", ignoreCase = true)
+                ) {
+                    return@after
+                }
+                Log.i("Received Activity: ${act.javaClass.name}")
 
                 if (!HookStateHolder.gotContext) {
                     Log.w("Activity created before we got Context, process may have been recreated!")
@@ -87,6 +120,20 @@ class Main : Module(), IXposedHookLoadPackage, IXposedHookZygoteInit {
 
                 this@Main.onActivity(act)
                 HookStateHolder.readyDeferred.complete(Unit)
+            }
+        }
+
+        targetActivityClass.hookMethod("onResume") {
+            after {
+                val act = thisObject as Activity
+                this@Main.onResume(act)
+            }
+        }
+
+        targetActivityClass.hookMethod("onPause") {
+            after {
+                val act = thisObject as Activity
+                this@Main.onPause(act)
             }
         }
 
@@ -105,6 +152,14 @@ class Main : Module(), IXposedHookLoadPackage, IXposedHookZygoteInit {
 
     override fun onActivity(activity: Activity) {
         dispatch("onActivity") { module -> module.onActivity(activity) }
+    }
+
+    override fun onResume(activity: Activity) {
+        dispatch("onResume") { module -> module.onResume(activity) }
+    }
+
+    override fun onPause(activity: Activity) {
+        dispatch("onPause") { module -> module.onPause(activity) }
     }
 
     private fun dispatch(stage: String, block: (Module) -> Unit) {
