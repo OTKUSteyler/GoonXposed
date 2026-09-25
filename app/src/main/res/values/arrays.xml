@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="xposed_scope">
+        <item>com.discord</item>
+        <item>com.discord.canary</item>
+        <item>com.discord.ptb</item>
+        <item>dev.shiggy.cord</item>
+    </string-array>
+</resources>

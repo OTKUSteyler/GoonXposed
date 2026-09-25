@@ -16,6 +16,9 @@
             android:value="Xposed module to inject GoonCord into discord"
         />
         <meta-data android:name="xposedminversion" android:value="82" />
-        <meta-data android:name="xposedscope" android:value="com.discord" />
+        <meta-data
+            android:name="xposedscope"
+            android:resource="@array/xposed_scope"
+        />
     </application>
 </manifest>
