@@ -189,3 +189,5 @@ Please refer to the `LICENSE` file in the repository root for the project licens
 ---
 
 Thank you for using GoonXposed.
+
+![OTKUSteyler](https://count.getloli.com/@OTKUSteyler?name=OTKUSteyler&theme=miku&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=1)
