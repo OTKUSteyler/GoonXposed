@@ -1,6 +1,6 @@
-# ShiggyXposed
+# GoonXposed
 
-ShiggyXposed is an Xposed module (Kotlin) that injects the ShiggyCord client modifications into the official Discord Android application. It provides an in-app recovery/dev menu (LogBox) that lets you manage bundle loading, themes, and other developer helpers.
+GoonXposed is an Xposed module (Kotlin) that injects the GoonCord client modifications into the official Discord Android application. It provides an in-app recovery/dev menu (LogBox) that lets you manage bundle loading, themes, and other developer helpers.
 
 This README explains prerequisites, installation, usage, troubleshooting, and credits. If you want help, open an issue on the repository or join the project's support server (links below).
 
@@ -26,13 +26,13 @@ This README explains prerequisites, installation, usage, troubleshooting, and cr
 
 ## What is this
 
-ShiggyXposed injects a patched ShiggyCord bundle into the official Discord application by using the Xposed framework. It's intended for users who run a rooted Android device and want to apply client-side modifications to Discord.
+GoonXposed injects a patched GoonCord bundle into the official Discord application by using the Xposed framework. It's intended for users who run a rooted Android device and want to apply client-side modifications to Discord.
 
 ---
 
 ## Features
 
-- Inject a custom ShiggyCord bundle into Discord.
+- Inject a custom GoonCord bundle into Discord.
 - Toggle bundle injection on/off (marker-based).
 - Load a custom bundle URL and toggle it on/off.
 - Recovery/LogBox action sheet for reload, safe-mode, refetch/reset, and options.
@@ -44,7 +44,7 @@ ShiggyXposed injects a patched ShiggyCord bundle into the official Discord appli
 
 ## Prerequisites
 
-Before installing and using ShiggyXposed:
+Before installing and using GoonXposed:
 
 - A rooted Android device. Supported root solutions you might use:
   - Magisk, KernelSU, KernelSUNext, or Sukisu Ultra.
@@ -60,7 +60,7 @@ Before installing and using ShiggyXposed:
    - https://github.com/kmmiio99o/ShiggyXposed/releases
 2. Install the APK on your device (standard package install).
 3. Open your LSPosed manager (or chosen Xposed manager).
-4. Enable the ShiggyXposed module and ensure the module's scope includes the Discord app.
+4. Enable the GoonXposed module and ensure the module's scope includes the Discord app.
 5. Reboot your device (or restart the system process) for changes to take effect.
 
 ---
@@ -124,7 +124,7 @@ Notes:
 ## Troubleshooting & FAQ
 
 1. Module not working or not showing in Discord?
-   - Ensure ShiggyXposed is enabled in LSPosed and Discord is included in the module's scope.
+   - Ensure GoonXposed is enabled in LSPosed and Discord is included in the module's scope.
    - Reboot after enabling the module.
    - Confirm you have the compatible LSPosed fork installed (JingMatrix recommended).
 
@@ -182,10 +182,10 @@ Please refer to the `LICENSE` file in the repository root for the project licens
 
 ## Contact & Links
 
-- Releases: https://github.com/kmmiio99o/ShiggyXposed/releases
-- Repository: https://github.com/kmmiio99o/ShiggyXposed
+- Releases: https://github.com/OTKUSteyler/GoonXposed/releases
+- Repository: https://github.com/OTKUSteyler/GoonXposed
 - Support server: https://discord.gg/nQykFF9Ud6
 
 ---
 
-Thank you for using ShiggyXposed.
+Thank you for using GoonXposed.
